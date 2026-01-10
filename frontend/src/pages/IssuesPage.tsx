@@ -1,17 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
-import {
-  Box,
-  Button,
-  Grid,
-  MenuItem,
-  Paper,
-  Select,
-  Stack,
-  Typography
-} from '@mui/material'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../lib/api'
 import { useSearchParams } from 'react-router-dom'
+import { Page } from '../components/Page'
+import { SectionHeader } from '../components/SectionHeader'
+import { StackCard } from '../components/StackCard'
+import { AnimatedDialog } from '../components/AnimatedDialog'
+import { Button } from '../components/ui/button'
+import { Select } from '../components/ui/select'
+import { Badge } from '../components/ui/badge'
+import { Skeleton } from '../components/ui/skeleton'
 
 export default function IssuesPage() {
   const [searchParams] = useSearchParams()
@@ -22,6 +20,8 @@ export default function IssuesPage() {
   const [severity, setSeverity] = useState<string>('')
   const [selectedIssue, setSelectedIssue] = useState<any | null>(null)
   const [explanation, setExplanation] = useState<any | null>(null)
+  const [explainOpen, setExplainOpen] = useState(false)
+  const [explainLoading, setExplainLoading] = useState(false)
 
   const { data: issues } = useQuery({
     queryKey: ['issues', selectedPcap],
@@ -41,6 +41,7 @@ export default function IssuesPage() {
   useEffect(() => {
     setSelectedIssue(null)
     setExplanation(null)
+    setExplainOpen(false)
   }, [selectedPcap, severity])
 
   const filtered = useMemo(() => {
@@ -50,111 +51,126 @@ export default function IssuesPage() {
 
   const explain = async () => {
     if (!selectedIssue) return
-    const data = await api.explainIssue(String(selectedIssue.id))
-    setExplanation(data)
+    setExplainOpen(true)
+    setExplainLoading(true)
+    try {
+      const data = await api.explainIssue(String(selectedIssue.id))
+      setExplanation(data)
+    } catch (err) {
+      setExplanation({ response: 'Failed to generate explanation.', shared: {} })
+    } finally {
+      setExplainLoading(false)
+    }
   }
 
   return (
-    <Box>
-      <Paper className="glass" sx={{ padding: 3, marginBottom: 2 }}>
-        <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems="center">
-          <Box>
-            <Typography variant="h5">Issues</Typography>
-            <Typography variant="body2" color="text.secondary">
-              Filter by severity and ask AI to explain a finding.
-            </Typography>
-          </Box>
-          <Box sx={{ flexGrow: 1 }} />
-          <Select
-            value={selectedPcap}
-            onChange={(e) => setSelectedPcap(String(e.target.value))}
-            displayEmpty
-            sx={{ minWidth: 220 }}
-          >
-            <MenuItem value="">Select PCAP</MenuItem>
-            {pcaps?.map((pcap: any) => (
-              <MenuItem key={pcap.id} value={pcap.id}>
-                {pcap.filename}
-              </MenuItem>
-            ))}
-          </Select>
-          <Select value={severity} onChange={(e) => setSeverity(String(e.target.value))} displayEmpty>
-            <MenuItem value="">All Severities</MenuItem>
-            <MenuItem value="HIGH">HIGH</MenuItem>
-            <MenuItem value="MED">MED</MenuItem>
-            <MenuItem value="LOW">LOW</MenuItem>
-          </Select>
-        </Stack>
-      </Paper>
+    <Page>
+      <div className="space-y-4">
+        <StackCard>
+          <SectionHeader title="Issues" subtitle="Filter by severity and ask AI to explain a finding.">
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Select value={selectedPcap} onChange={(e) => setSelectedPcap(String(e.target.value))}>
+                <option value="">Select PCAP</option>
+                {pcaps?.map((pcap: any) => (
+                  <option key={pcap.id} value={pcap.id}>
+                    {pcap.filename}
+                  </option>
+                ))}
+              </Select>
+              <Select value={severity} onChange={(e) => setSeverity(String(e.target.value))}>
+                <option value="">All Severities</option>
+                <option value="HIGH">HIGH</option>
+                <option value="MED">MED</option>
+                <option value="LOW">LOW</option>
+              </Select>
+            </div>
+          </SectionHeader>
+        </StackCard>
 
-      <Grid container spacing={2}>
-        <Grid item xs={12} md={6}>
-          <Paper className="glass" sx={{ padding: 3, height: '100%' }}>
-            <Typography variant="h6">Issue List</Typography>
-            <Stack spacing={2} sx={{ marginTop: 2 }}>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+          <StackCard className="lg:col-span-1">
+            <div className="text-sm font-semibold mb-2">Filters</div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-muted-foreground">Selected PCAP</span>
+                <Badge variant="low">{selectedPcap || 'None'}</Badge>
+              </div>
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-muted-foreground">Severity</span>
+                <Badge variant={severity === 'HIGH' ? 'high' : severity === 'MED' ? 'med' : 'low'}>
+                  {severity || 'Any'}
+                </Badge>
+              </div>
+            </div>
+          </StackCard>
+
+          <StackCard className="lg:col-span-1">
+            <div className="text-sm font-semibold mb-2">Issue List</div>
+            <div className="space-y-2 max-h-[420px] overflow-auto scroll-sharp">
               {filtered.map((issue: any) => (
-                <Box
+                <StackCard
                   key={issue.id}
-                  sx={{
-                    border: '1px solid #e3e6eb',
-                    borderRadius: 2,
-                    padding: 2,
-                    cursor: 'pointer'
-                  }}
+                  className="cursor-pointer hover:border-primary/60"
                   onClick={() => {
                     setSelectedIssue(issue)
                     setExplanation(null)
                   }}
                 >
-                  <Typography variant="subtitle2">{issue.title}</Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {issue.severity} · {issue.type}
-                  </Typography>
-                </Box>
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm font-medium">{issue.title}</div>
+                    <Badge
+                      variant={
+                        issue.severity === 'HIGH' ? 'high' : issue.severity === 'MED' ? 'med' : 'low'
+                      }
+                    >
+                      {issue.severity}
+                    </Badge>
+                  </div>
+                  <div className="text-xs text-muted-foreground">{issue.type}</div>
+                </StackCard>
               ))}
               {!filtered.length && (
-                <Typography variant="body2" color="text.secondary">
-                  Select a PCAP to view issues.
-                </Typography>
+                <div className="text-xs text-muted-foreground">Select a PCAP to view issues.</div>
               )}
-            </Stack>
-          </Paper>
-        </Grid>
-        <Grid item xs={12} md={6}>
-          <Paper className="glass" sx={{ padding: 3, height: '100%' }}>
-            <Typography variant="h6">Explain This Issue</Typography>
+            </div>
+          </StackCard>
+
+          <StackCard className="lg:col-span-1">
+            <div className="text-sm font-semibold mb-2">Issue Inspector</div>
             {selectedIssue ? (
-              <Stack spacing={2} sx={{ marginTop: 2 }}>
-                <Typography variant="subtitle2">{selectedIssue.title}</Typography>
-                <Typography variant="body2" color="text.secondary">
-                  {selectedIssue.description}
-                </Typography>
-                <Button variant="contained" onClick={explain}>
+              <div className="space-y-2 text-sm">
+                <div className="font-semibold">{selectedIssue.title}</div>
+                <div className="text-muted-foreground">{selectedIssue.description}</div>
+                <Button size="sm" onClick={explain}>
                   Explain with AI
                 </Button>
-                {explanation && (
-                  <Box>
-                    <Typography variant="subtitle2">AI Response</Typography>
-                    <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', marginTop: 1 }}>
-                      {explanation.response}
-                    </Typography>
-                    <Typography variant="subtitle2" sx={{ marginTop: 2 }}>
-                      Data Shared
-                    </Typography>
-                    <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
-                      {JSON.stringify(explanation.shared, null, 2)}
-                    </Typography>
-                  </Box>
-                )}
-              </Stack>
+              </div>
             ) : (
-              <Typography variant="body2" color="text.secondary" sx={{ marginTop: 2 }}>
-                Select an issue to view details and generate an explanation.
-              </Typography>
+              <div className="text-xs text-muted-foreground">Select an issue to view details.</div>
             )}
-          </Paper>
-        </Grid>
-      </Grid>
-    </Box>
+          </StackCard>
+        </div>
+      </div>
+
+      <AnimatedDialog open={explainOpen} onClose={() => setExplainOpen(false)} title="AI Explanation">
+        {explainLoading ? (
+          <div className="flex items-center justify-center gap-2 py-6">
+            <Skeleton className="h-4 w-24" />
+            <span className="text-sm text-muted-foreground">Generating explanation...</span>
+          </div>
+        ) : explanation ? (
+          <div className="space-y-2 text-sm">
+            <div className="font-semibold">AI Response</div>
+            <div className="whitespace-pre-wrap">{explanation.response}</div>
+            <div className="font-semibold pt-2">Data Shared</div>
+            <pre className="text-xs bg-secondary/30 border border-border rounded p-2 overflow-auto">
+              {JSON.stringify(explanation.shared, null, 2)}
+            </pre>
+          </div>
+        ) : (
+          <div className="text-sm text-muted-foreground">No explanation yet.</div>
+        )}
+      </AnimatedDialog>
+    </Page>
   )
 }

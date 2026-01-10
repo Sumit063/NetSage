@@ -1,18 +1,12 @@
-import { Box, Button, Grid, Paper, Stack, Typography } from '@mui/material'
 import { useQuery } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
 import { api } from '../lib/api'
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis
-} from 'recharts'
+import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { Page } from '../components/Page'
+import { Panel } from '../components/Panel'
+import { Button } from '../components/ui/button'
+import { Badge } from '../components/ui/badge'
+import { Skeleton } from '../components/ui/skeleton'
 
 function parseJsonField<T>(value: string | null): T {
   if (!value) return [] as T
@@ -48,136 +42,136 @@ export default function PcapDetailPage() {
     ? hist.buckets.map((bucket: number, index: number) => ({ bucket, count: hist.counts[index] || 0 }))
     : []
 
+  const axisTick = { fill: 'hsl(var(--muted-foreground))', fontSize: 12 }
+  const tooltipStyle = {
+    background: 'hsl(var(--card))',
+    border: '1px solid hsl(var(--border))',
+    color: 'hsl(var(--foreground))'
+  }
+
   return (
-    <Box>
-      <Grid container spacing={2}>
-        <Grid item xs={12} md={4}>
-          <Paper className="glass" sx={{ padding: 3 }}>
-            <Typography variant="overline" color="text.secondary">
-              Total Flows
-            </Typography>
-            <Typography variant="h4">{summary?.total_flows || 0}</Typography>
-          </Paper>
-        </Grid>
-        <Grid item xs={12} md={4}>
-          <Paper className="glass" sx={{ padding: 3 }}>
-            <Typography variant="overline" color="text.secondary">
-              TCP / UDP
-            </Typography>
-            <Typography variant="h4">
-              {summary?.tcp_flows || 0} / {summary?.udp_flows || 0}
-            </Typography>
-          </Paper>
-        </Grid>
-        <Grid item xs={12} md={4}>
-          <Paper className="glass" sx={{ padding: 3 }}>
-            <Typography variant="overline" color="text.secondary">
-              Issues (H/M/L)
-            </Typography>
-            <Typography variant="h4">
-              {summary?.issues?.HIGH || 0}/{summary?.issues?.MED || 0}/{summary?.issues?.LOW || 0}
-            </Typography>
-          </Paper>
-        </Grid>
-      </Grid>
+    <Page>
+      <div className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <Panel className="p-4">
+            <div className="text-xs uppercase text-muted-foreground">Total Flows</div>
+            <div className="text-2xl font-semibold">{summary?.total_flows ?? <Skeleton className="h-6 w-20" />}</div>
+          </Panel>
+          <Panel className="p-4">
+            <div className="text-xs uppercase text-muted-foreground">TCP / UDP</div>
+            <div className="text-2xl font-semibold">
+              {summary ? `${summary.tcp_flows || 0} / ${summary.udp_flows || 0}` : <Skeleton className="h-6 w-24" />}
+            </div>
+          </Panel>
+          <Panel className="p-4">
+            <div className="text-xs uppercase text-muted-foreground">Issues H/M/L</div>
+            <div className="text-2xl font-semibold">
+              {summary
+                ? `${summary?.issues?.HIGH || 0}/${summary?.issues?.MED || 0}/${summary?.issues?.LOW || 0}`
+                : <Skeleton className="h-6 w-24" />}
+            </div>
+          </Panel>
+        </div>
 
-      <Grid container spacing={2} sx={{ marginTop: 1 }}>
-        <Grid item xs={12} md={6}>
-          <Paper className="glass" sx={{ padding: 3, height: 320 }}>
-            <Typography variant="h6">Top Talkers</Typography>
-            <ResponsiveContainer width="100%" height="85%">
-              <BarChart data={topTalkers} margin={{ top: 20, right: 10, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="key" hide />
-                <YAxis />
-                <Tooltip />
-                <Bar dataKey="value" fill="#1f7a8c" />
-              </BarChart>
-            </ResponsiveContainer>
-          </Paper>
-        </Grid>
-        <Grid item xs={12} md={6}>
-          <Paper className="glass" sx={{ padding: 3, height: 320 }}>
-            <Typography variant="h6">RTT Distribution (ms)</Typography>
-            <ResponsiveContainer width="100%" height="85%">
-              <BarChart data={rttData} margin={{ top: 20, right: 10, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="bucket" />
-                <YAxis />
-                <Tooltip />
-                <Bar dataKey="count" fill="#e08e45" />
-              </BarChart>
-            </ResponsiveContainer>
-          </Paper>
-        </Grid>
-      </Grid>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+          <Panel className="p-4">
+            <div className="text-sm font-semibold mb-2">Top Talkers</div>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={topTalkers} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis dataKey="key" hide />
+                  <YAxis tick={axisTick} />
+                  <Tooltip contentStyle={tooltipStyle} />
+                  <Bar dataKey="value" fill="hsl(var(--chart-1))" radius={[2, 2, 0, 0]} barSize={18} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </Panel>
+          <Panel className="p-4">
+            <div className="text-sm font-semibold mb-2">RTT Distribution (ms)</div>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={rttData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis dataKey="bucket" tick={axisTick} />
+                  <YAxis tick={axisTick} />
+                  <Tooltip contentStyle={tooltipStyle} />
+                  <Bar dataKey="count" fill="hsl(var(--chart-3))" radius={[2, 2, 0, 0]} barSize={18} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </Panel>
+        </div>
 
-      <Grid container spacing={2} sx={{ marginTop: 1 }}>
-        <Grid item xs={12} md={6}>
-          <Paper className="glass" sx={{ padding: 3, height: 320 }}>
-            <Typography variant="h6">Issues Over Time</Typography>
-            <ResponsiveContainer width="100%" height="85%">
-              <LineChart data={issuesChart} margin={{ top: 20, right: 10, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="day" />
-                <YAxis allowDecimals={false} />
-                <Tooltip />
-                <Line dataKey="count" stroke="#1f7a8c" strokeWidth={2} />
-              </LineChart>
-            </ResponsiveContainer>
-          </Paper>
-        </Grid>
-        <Grid item xs={12} md={6}>
-          <Paper className="glass" sx={{ padding: 3, height: 320 }}>
-            <Typography variant="h6">Top Flows</Typography>
-            <Stack spacing={1} sx={{ marginTop: 1, maxHeight: 250, overflow: 'auto' }}>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+          <Panel className="p-4">
+            <div className="text-sm font-semibold mb-2">Issues Over Time</div>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={issuesChart} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="issueFill" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="hsl(var(--chart-2))" stopOpacity={0.45} />
+                      <stop offset="100%" stopColor="hsl(var(--chart-2))" stopOpacity={0.05} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis dataKey="day" tick={axisTick} />
+                  <YAxis allowDecimals={false} tick={axisTick} />
+                  <Tooltip contentStyle={tooltipStyle} />
+                  <Area
+                    type="monotone"
+                    dataKey="count"
+                    stroke="hsl(var(--chart-2))"
+                    fill="url(#issueFill)"
+                    strokeWidth={2}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </Panel>
+          <Panel className="p-4">
+            <div className="text-sm font-semibold mb-2">Top Flows</div>
+            <div className="space-y-2 max-h-64 overflow-auto scroll-sharp">
               {topFlows?.map((flow: any) => (
-                <Box key={flow.key} sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <Typography variant="body2">{flow.key}</Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {Math.round(flow.value / 1024)} KB
-                  </Typography>
-                </Box>
+                <div key={flow.key} className="flex items-center justify-between text-sm">
+                  <div className="font-mono text-xs text-muted-foreground truncate max-w-[70%]">{flow.key}</div>
+                  <div className="text-xs font-medium">{Math.round(flow.value / 1024)} KB</div>
+                </div>
               ))}
-            </Stack>
-          </Paper>
-        </Grid>
-      </Grid>
+              {!topFlows?.length && <div className="text-xs text-muted-foreground">No data yet.</div>}
+            </div>
+          </Panel>
+        </div>
 
-      <Paper className="glass" sx={{ padding: 3, marginTop: 3 }}>
-        <Stack direction="row" justifyContent="space-between" alignItems="center">
-          <Typography variant="h6">Recent Flows</Typography>
-          <Button component={Link} to={`/issues?pcap=${id}`} variant="outlined">
-            View Issues
-          </Button>
-        </Stack>
-        <Stack spacing={1} sx={{ marginTop: 2 }}>
-          {flows?.slice(0, 10).map((flow: any) => (
-            <Box
-              key={flow.id}
-              sx={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                padding: 2,
-                border: '1px solid #e3e6eb',
-                borderRadius: 2
-              }}
-            >
-              <Box>
-                <Typography variant="subtitle2">
-                  {flow.src_ip}:{flow.src_port} → {flow.dst_ip}:{flow.dst_port} ({flow.proto})
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  RTT {typeof flow.rtt_ms === 'number' ? flow.rtt_ms.toFixed(1) : 'n/a'} ms · Retrans {flow.retransmits}
-                </Typography>
-              </Box>
-              <Button component={Link} to={`/flows/${flow.id}`} variant="contained">
-                Inspect
-              </Button>
-            </Box>
-          ))}
-        </Stack>
-      </Paper>
-    </Box>
+        <Panel className="p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="text-sm font-semibold">Recent Flows</div>
+            <Button variant="outline" asChild>
+              <Link to={`/issues?pcap=${id}`}>View Issues</Link>
+            </Button>
+          </div>
+          <div className="space-y-2">
+            {flows?.slice(0, 10).map((flow: any) => (
+              <div key={flow.id} className="flex items-center justify-between border border-border rounded-md p-2">
+                <div>
+                  <div className="text-sm font-medium">
+                    {flow.src_ip}:{flow.src_port} → {flow.dst_ip}:{flow.dst_port} ({flow.proto})
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    RTT {typeof flow.rtt_ms === 'number' ? flow.rtt_ms.toFixed(1) : 'n/a'} ms · Retrans {flow.retransmits}
+                  </div>
+                </div>
+                <Button variant="ghost" size="sm" asChild>
+                  <Link to={`/flows/${flow.id}`}>Inspect</Link>
+                </Button>
+              </div>
+            ))}
+            {!flows?.length && <div className="text-xs text-muted-foreground">No flows found.</div>}
+          </div>
+        </Panel>
+      </div>
+    </Page>
   )
 }

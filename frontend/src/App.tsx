@@ -4,7 +4,7 @@ import PcapsPage from './pages/PcapsPage'
 import PcapDetailPage from './pages/PcapDetailPage'
 import FlowDetailPage from './pages/FlowDetailPage'
 import IssuesPage from './pages/IssuesPage'
-import { AppLayout } from './components/AppLayout'
+import { Shell } from './components/Shell'
 import { RequireAuth } from './components/RequireAuth'
 
 export default function App() {
@@ -15,9 +15,9 @@ export default function App() {
         path="/"
         element={
           <RequireAuth>
-            <AppLayout>
+            <Shell>
               <Navigate to="/pcaps" replace />
-            </AppLayout>
+            </Shell>
           </RequireAuth>
         }
       />
@@ -25,9 +25,9 @@ export default function App() {
         path="/pcaps"
         element={
           <RequireAuth>
-            <AppLayout>
+            <Shell>
               <PcapsPage />
-            </AppLayout>
+            </Shell>
           </RequireAuth>
         }
       />
@@ -35,9 +35,9 @@ export default function App() {
         path="/pcaps/:id"
         element={
           <RequireAuth>
-            <AppLayout>
+            <Shell>
               <PcapDetailPage />
-            </AppLayout>
+            </Shell>
           </RequireAuth>
         }
       />
@@ -45,9 +45,9 @@ export default function App() {
         path="/flows/:id"
         element={
           <RequireAuth>
-            <AppLayout>
+            <Shell>
               <FlowDetailPage />
-            </AppLayout>
+            </Shell>
           </RequireAuth>
         }
       />
@@ -55,9 +55,9 @@ export default function App() {
         path="/issues"
         element={
           <RequireAuth>
-            <AppLayout>
+            <Shell>
               <IssuesPage />
-            </AppLayout>
+            </Shell>
           </RequireAuth>
         }
       />
