@@ -1,0 +1,232 @@
+openapi: 3.0.3
+info:
+  title: NetSage API
+  version: 0.1.0
+servers:
+  - url: http://localhost:8080
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+paths:
+  /api/auth/register:
+    post:
+      summary: Register a user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                password:
+                  type: string
+      responses:
+        '200':
+          description: JWT token
+  /api/auth/login:
+    post:
+      summary: Login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                password:
+                  type: string
+      responses:
+        '200':
+          description: JWT token
+  /api/me:
+    get:
+      security:
+        - bearerAuth: []
+      summary: Current user
+      responses:
+        '200':
+          description: User profile
+  /api/pcaps/upload:
+    post:
+      security:
+        - bearerAuth: []
+      summary: Upload PCAP
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                pcap:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Job created
+  /api/pcaps:
+    get:
+      security:
+        - bearerAuth: []
+      summary: List PCAPs
+      responses:
+        '200':
+          description: List PCAPs
+  /api/pcaps/{id}:
+    get:
+      security:
+        - bearerAuth: []
+      summary: Get PCAP
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: PCAP detail
+  /api/pcaps/{id}/jobs:
+    get:
+      security:
+        - bearerAuth: []
+      summary: List jobs for PCAP
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Job list
+  /api/jobs/{id}:
+    get:
+      security:
+        - bearerAuth: []
+      summary: Get job
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Job detail
+  /api/pcaps/{id}/flows:
+    get:
+      security:
+        - bearerAuth: []
+      summary: List flows
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Flow list
+  /api/flows/{id}:
+    get:
+      security:
+        - bearerAuth: []
+      summary: Get flow
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Flow detail
+  /api/pcaps/{id}/issues:
+    get:
+      security:
+        - bearerAuth: []
+      summary: List issues
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: severity
+          in: query
+          schema:
+            type: string
+        - name: type
+          in: query
+          schema:
+            type: string
+        - name: flow_id
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Issue list
+  /api/pcaps/{id}/stats:
+    get:
+      security:
+        - bearerAuth: []
+      summary: Get PCAP stats
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Stats payload
+  /api/pcaps/{id}/summary:
+    get:
+      security:
+        - bearerAuth: []
+      summary: Get summary cards
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Summary counts
+  /api/issues/{id}/explain:
+    post:
+      security:
+        - bearerAuth: []
+      summary: Explain issue with AI
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Explanation
+  /api/flows/{id}/cert-inspect:
+    post:
+      security:
+        - bearerAuth: []
+      summary: Active certificate inspection
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Certificate report

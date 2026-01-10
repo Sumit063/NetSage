@@ -1,0 +1,18 @@
+# Go
+/backend/bin
+/backend/*.exe
+/backend/*.test
+/backend/*.out
+
+# Node
+/frontend/node_modules
+/frontend/dist
+
+# env
+.env
+
+# uploads
+/backend/uploads
+
+# logs
+working_guide.log

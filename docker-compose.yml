@@ -1,0 +1,81 @@
+services:
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: netsage
+      POSTGRES_PASSWORD: netsage
+      POSTGRES_DB: netsage
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U netsage -d netsage"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  migrate:
+    build:
+      context: ./backend
+    command: ["/app/migrate"]
+    environment:
+      NETSAGE_DATABASE_URL: postgres://netsage:netsage@db:5432/netsage?sslmode=disable
+      NETSAGE_MIGRATIONS_DIR: /app/migrations
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: on-failure
+
+  api:
+    build:
+      context: ./backend
+    command: ["/app/api"]
+    environment:
+      NETSAGE_DATABASE_URL: postgres://netsage:netsage@db:5432/netsage?sslmode=disable
+      NETSAGE_HTTP_ADDR: ":8080"
+      NETSAGE_JWT_SECRET: "dev-secret-change"
+      NETSAGE_UPLOAD_DIR: "/data/uploads"
+      NETSAGE_MAX_UPLOAD_MB: "100"
+      NETSAGE_AI_ENABLED: "true"
+    ports:
+      - "8080:8080"
+    volumes:
+      - uploads:/data/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: ./backend
+    command: ["/app/worker"]
+    environment:
+      NETSAGE_DATABASE_URL: postgres://netsage:netsage@db:5432/netsage?sslmode=disable
+      NETSAGE_UPLOAD_DIR: "/data/uploads"
+      NETSAGE_AI_ENABLED: "true"
+    volumes:
+      - uploads:/data/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+    environment:
+      VITE_API_URL: http://localhost:8080
+    ports:
+      - "5173:5173"
+    depends_on:
+      - api
+
+volumes:
+  db_data:
+  uploads:
