@@ -1,5 +1,7 @@
 # NetSage — AI-Assisted Packet & Flow Intelligence
 
+![CI](https://github.com/your-org/your-repo/actions/workflows/ci.yml/badge.svg)
+
 NetSage is a Go + React system that analyzes PCAP files, reconstructs flows, surfaces network issues, and provides an AI-assisted explanation workflow. It is designed as a practical internal tool for SRE/security teams to spot latency, retransmission, TLS, and MTU problems without loading entire captures into memory.
 
 ## Why it matters
@@ -11,7 +13,7 @@ NetSage is a Go + React system that analyzes PCAP files, reconstructs flows, sur
 ```
               +--------------------+
               |  React Dashboard   |
-              |  Vite + MUI + RQ   |
+              |  Vite + Tailwind   |
               +---------+----------+
                         |
                         v
@@ -35,6 +37,9 @@ docker-compose up --build
 ```
 - Frontend: `http://localhost:5173`
 - API: `http://localhost:8080`
+
+## Deployment (Vercel + Render)
+See `docs/DEPLOYMENT.md` for the full CI/CD flow.
 
 ## Upload and analyze
 1. Create an account.

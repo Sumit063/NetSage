@@ -37,6 +37,7 @@ services:
       NETSAGE_JWT_SECRET: "dev-secret-change"
       NETSAGE_UPLOAD_DIR: "/data/uploads"
       NETSAGE_MAX_UPLOAD_MB: "100"
+      NETSAGE_CORS_ALLOWED_ORIGINS: "http://localhost:5173"
       NETSAGE_AI_ENABLED: "true"
     ports:
       - "8080:8080"
@@ -70,7 +71,7 @@ services:
     build:
       context: ./frontend
     environment:
-      VITE_API_URL: http://localhost:8080
+      VITE_API_BASE_URL: http://localhost:8080
     ports:
       - "5173:5173"
     depends_on:
