@@ -7,7 +7,7 @@ services:
     plan: starter
     autoDeploy: true
     healthCheckPath: /health
-    startCommand: /app/api
+    dockerCommand: /app/api
     preDeployCommand: /app/migrate up
     envVars:
       - key: NETSAGE_DATABASE_URL
@@ -44,7 +44,7 @@ services:
     dockerfilePath: backend/Dockerfile
     plan: starter
     autoDeploy: true
-    startCommand: /app/worker
+    dockerCommand: /app/worker
     envVars:
       - key: NETSAGE_DATABASE_URL
         fromDatabase:
