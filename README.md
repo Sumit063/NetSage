@@ -41,6 +41,8 @@ docker-compose up --build
 ## Deployment (Vercel + Render)
 See `docs/DEPLOYMENT.md` for the full CI/CD flow.
 
+Note: If Render storage is limited to a single disk, run API + worker in one service using `/app/run_all.sh` as the start command.
+
 ## Upload and analyze
 1. Create an account.
 2. Upload a `.pcap` file on the **Upload & Jobs** page.

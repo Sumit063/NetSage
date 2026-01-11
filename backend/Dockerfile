@@ -21,7 +21,8 @@ COPY --from=build /out/worker /app/worker
 COPY --from=build /out/migrate /app/migrate
 COPY --from=build /app/migrations /app/migrations
 COPY entrypoint.sh /app/entrypoint.sh
-RUN chmod +x /app/entrypoint.sh
+COPY --from=build /app/run_all.sh /app/run_all.sh
+RUN chmod +x /app/entrypoint.sh /app/run_all.sh
 
 ENTRYPOINT ["/app/entrypoint.sh"]
 
