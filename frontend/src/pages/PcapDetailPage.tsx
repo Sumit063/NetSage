@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
 import { api } from '../lib/api'
-import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { CartesianGrid, Cell, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { Page } from '../components/Page'
 import { Panel } from '../components/Panel'
 import { Button } from '../components/ui/button'
@@ -31,22 +31,49 @@ export default function PcapDetailPage() {
 
   const issuesOverTime = Array.isArray(issues)
     ? issues.reduce((acc: Record<string, number>, issue: any) => {
-        const day = new Date(issue.created_at).toLocaleDateString()
+        const day = new Date(issue.created_at).toISOString().slice(0, 10)
         acc[day] = (acc[day] || 0) + 1
         return acc
       }, {})
     : {}
-  const issuesChart = Object.entries(issuesOverTime).map(([day, count]) => ({ day, count }))
+  const issuesChart = Object.entries(issuesOverTime)
+    .map(([day, count]) => ({ day, count }))
+    .sort((a, b) => (a.day < b.day ? -1 : 1))
 
   const rttData = hist?.buckets
     ? hist.buckets.map((bucket: number, index: number) => ({ bucket, count: hist.counts[index] || 0 }))
     : []
 
   const axisTick = { fill: 'hsl(var(--muted-foreground))', fontSize: 12 }
+  const axisLabel = { fill: 'hsl(var(--muted-foreground))', fontSize: 11 }
   const tooltipStyle = {
     background: 'hsl(var(--card))',
     border: '1px solid hsl(var(--border))',
     color: 'hsl(var(--foreground))'
+  }
+  const protocolPie = summary
+    ? [
+        { name: 'TCP', value: summary.tcp_flows || 0 },
+        { name: 'UDP', value: summary.udp_flows || 0 }
+      ]
+    : []
+  const issuePie = summary
+    ? [
+        { name: 'HIGH', value: summary.issues?.HIGH || 0 },
+        { name: 'MED', value: summary.issues?.MED || 0 },
+        { name: 'LOW', value: summary.issues?.LOW || 0 }
+      ]
+    : []
+
+  const renderPieLabel = (props: { cx: number; cy: number; midAngle: number; outerRadius: number; name: string; value: number }) => {
+    const radius = props.outerRadius + 14
+    const x = props.cx + radius * Math.cos(-props.midAngle * (Math.PI / 180))
+    const y = props.cy + radius * Math.sin(-props.midAngle * (Math.PI / 180))
+    return (
+      <text x={x} y={y} fill="hsl(var(--foreground))" textAnchor={x > props.cx ? 'start' : 'end'} dominantBaseline="central" fontSize={12}>
+        {props.name} {props.value}
+      </text>
+    )
   }
 
   return (
@@ -75,16 +102,106 @@ export default function PcapDetailPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
           <Panel className="p-4">
+            <div className="text-sm font-semibold mb-2">Protocol Split</div>
+            <div className="h-64 flex items-center">
+              {protocolPie.length ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Tooltip contentStyle={tooltipStyle} />
+                    <Pie
+                      data={protocolPie}
+                      dataKey="value"
+                      nameKey="name"
+                      innerRadius={55}
+                      outerRadius={80}
+                      paddingAngle={2}
+                      labelLine={false}
+                      label={renderPieLabel}
+                    >
+                      {protocolPie.map((entry) => (
+                        <Cell
+                          key={entry.name}
+                          fill={entry.name === 'TCP' ? 'hsl(var(--chart-1))' : 'hsl(var(--chart-4))'}
+                        />
+                      ))}
+                    </Pie>
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="text-xs text-muted-foreground">No data yet.</div>
+              )}
+            </div>
+            <div className="flex items-center gap-4 text-xs text-muted-foreground">
+              <span className="inline-flex items-center gap-1">
+                <span className="h-2 w-2 rounded-sm bg-[hsl(var(--chart-1))]" /> TCP
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <span className="h-2 w-2 rounded-sm bg-[hsl(var(--chart-4))]" /> UDP
+              </span>
+            </div>
+          </Panel>
+          <Panel className="p-4">
+            <div className="text-sm font-semibold mb-2">Issues by Severity</div>
+            <div className="h-64 flex items-center">
+              {issuePie.length ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Tooltip contentStyle={tooltipStyle} />
+                    <Pie
+                      data={issuePie}
+                      dataKey="value"
+                      nameKey="name"
+                      innerRadius={55}
+                      outerRadius={80}
+                      paddingAngle={2}
+                      labelLine={false}
+                      label={renderPieLabel}
+                    >
+                      {issuePie.map((entry) => (
+                        <Cell
+                          key={entry.name}
+                          fill={
+                            entry.name === 'HIGH'
+                              ? 'hsl(var(--chart-5))'
+                              : entry.name === 'MED'
+                              ? 'hsl(var(--chart-3))'
+                              : 'hsl(var(--chart-2))'
+                          }
+                        />
+                      ))}
+                    </Pie>
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="text-xs text-muted-foreground">No issues yet.</div>
+              )}
+            </div>
+            <div className="flex items-center gap-4 text-xs text-muted-foreground">
+              <span className="inline-flex items-center gap-1">
+                <span className="h-2 w-2 rounded-sm bg-[hsl(var(--chart-5))]" /> HIGH
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <span className="h-2 w-2 rounded-sm bg-[hsl(var(--chart-3))]" /> MED
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <span className="h-2 w-2 rounded-sm bg-[hsl(var(--chart-2))]" /> LOW
+              </span>
+            </div>
+          </Panel>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+          <Panel className="p-4">
             <div className="text-sm font-semibold mb-2">Top Talkers</div>
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={topTalkers} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
+                <LineChart data={topTalkers} margin={{ top: 10, right: 10, left: 10, bottom: 10 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="key" hide />
-                  <YAxis tick={axisTick} />
+                  <XAxis dataKey="key" tick={false} label={{ value: 'Talker', position: 'insideBottom', offset: -4, ...axisLabel }} />
+                  <YAxis tick={axisTick} label={{ value: 'Bytes', angle: -90, position: 'insideLeft', ...axisLabel }} />
                   <Tooltip contentStyle={tooltipStyle} />
-                  <Bar dataKey="value" fill="hsl(var(--chart-1))" radius={[2, 2, 0, 0]} barSize={18} />
-                </BarChart>
+                  <Line type="monotone" dataKey="value" stroke="hsl(var(--chart-1))" strokeWidth={2} dot={false} />
+                </LineChart>
               </ResponsiveContainer>
             </div>
           </Panel>
@@ -92,13 +209,13 @@ export default function PcapDetailPage() {
             <div className="text-sm font-semibold mb-2">RTT Distribution (ms)</div>
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={rttData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
+                <LineChart data={rttData} margin={{ top: 10, right: 10, left: 10, bottom: 10 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="bucket" tick={axisTick} />
-                  <YAxis tick={axisTick} />
+                  <XAxis dataKey="bucket" tick={axisTick} label={{ value: 'RTT bucket (ms)', position: 'insideBottom', offset: -4, ...axisLabel }} />
+                  <YAxis tick={axisTick} label={{ value: 'Count', angle: -90, position: 'insideLeft', ...axisLabel }} />
                   <Tooltip contentStyle={tooltipStyle} />
-                  <Bar dataKey="count" fill="hsl(var(--chart-3))" radius={[2, 2, 0, 0]} barSize={18} />
-                </BarChart>
+                  <Line type="monotone" dataKey="count" stroke="hsl(var(--chart-3))" strokeWidth={2} dot={false} />
+                </LineChart>
               </ResponsiveContainer>
             </div>
           </Panel>
@@ -109,25 +226,13 @@ export default function PcapDetailPage() {
             <div className="text-sm font-semibold mb-2">Issues Over Time</div>
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={issuesChart} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="issueFill" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="hsl(var(--chart-2))" stopOpacity={0.45} />
-                      <stop offset="100%" stopColor="hsl(var(--chart-2))" stopOpacity={0.05} />
-                    </linearGradient>
-                  </defs>
+                <LineChart data={issuesChart} margin={{ top: 10, right: 10, left: 10, bottom: 10 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="day" tick={axisTick} />
-                  <YAxis allowDecimals={false} tick={axisTick} />
+                  <XAxis dataKey="day" tick={axisTick} label={{ value: 'Date', position: 'insideBottom', offset: -4, ...axisLabel }} />
+                  <YAxis allowDecimals={false} tick={axisTick} label={{ value: 'Issues', angle: -90, position: 'insideLeft', ...axisLabel }} />
                   <Tooltip contentStyle={tooltipStyle} />
-                  <Area
-                    type="monotone"
-                    dataKey="count"
-                    stroke="hsl(var(--chart-2))"
-                    fill="url(#issueFill)"
-                    strokeWidth={2}
-                  />
-                </AreaChart>
+                  <Line type="monotone" dataKey="count" stroke="hsl(var(--chart-2))" strokeWidth={2} dot={false} />
+                </LineChart>
               </ResponsiveContainer>
             </div>
           </Panel>

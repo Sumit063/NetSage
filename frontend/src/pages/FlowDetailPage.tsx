@@ -9,6 +9,13 @@ import { Badge } from '../components/ui/badge'
 import { AnimatedDialog } from '../components/AnimatedDialog'
 import { Skeleton } from '../components/ui/skeleton'
 
+function formatTime(value?: string) {
+  if (!value) return 'n/a'
+  const ts = new Date(value)
+  if (Number.isNaN(ts.getTime())) return 'n/a'
+  return ts.toLocaleString()
+}
+
 export default function FlowDetailPage() {
   const { id } = useParams()
   const [certReport, setCertReport] = useState<any | null>(null)
@@ -31,6 +38,10 @@ export default function FlowDetailPage() {
   const subtitle = flow
     ? `${flow.src_ip}:${flow.src_port} → ${flow.dst_ip}:${flow.dst_port} (${flow.proto})`
     : 'Loading flow details...'
+
+  const mss = typeof flow?.mss === 'number' ? flow.mss : null
+  const mtuV4 = mss ? mss + 40 : null
+  const mtuV6 = mss ? mss + 60 : null
 
   return (
     <Page>
@@ -74,29 +85,69 @@ export default function FlowDetailPage() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <Panel className="p-4">
-            <div className="text-sm font-semibold">Timeline</div>
-            <div className="space-y-1 mt-2 text-sm">
-              <div>SYN: {flow?.syn_time || 'n/a'}</div>
-              <div>SYN/ACK: {flow?.syn_ack_time || 'n/a'}</div>
-              <div>ACK: {flow?.ack_time || 'n/a'}</div>
-              <div>TLS Hello: {flow?.tls_version ? 'observed' : 'n/a'}</div>
-              <div>HTTP Request: {flow?.http_time || 'n/a'}</div>
-            </div>
+            <div className="text-sm font-semibold">TCP/UDP Handshake</div>
+            {flow?.proto === 'TCP' ? (
+              <div className="space-y-1 mt-2 text-sm">
+                <div>SYN: {formatTime(flow?.syn_time)}</div>
+                <div>SYN/ACK: {formatTime(flow?.syn_ack_time)}</div>
+                <div>ACK: {formatTime(flow?.ack_time)}</div>
+                <div>Handshake RTT: {typeof flow?.rtt_ms === 'number' ? `${flow.rtt_ms.toFixed(1)} ms` : 'n/a'}</div>
+                <div>RSTs: {flow?.rst_count ?? 0}</div>
+              </div>
+            ) : (
+              <div className="space-y-1 mt-2 text-sm text-muted-foreground">
+                <div>UDP is connectionless (no handshake).</div>
+                <div>First seen: {formatTime(flow?.first_seen)}</div>
+                <div>Last seen: {formatTime(flow?.last_seen)}</div>
+              </div>
+            )}
           </Panel>
           <Panel className="p-4">
-            <div className="text-sm font-semibold">Metrics</div>
+            <div className="text-sm font-semibold">TLS Handshake</div>
             <div className="grid grid-cols-2 gap-2 text-sm mt-2">
-              <div className="text-muted-foreground">Bytes Sent</div>
-              <div className="font-mono">{flow?.bytes_sent ?? '—'}</div>
-              <div className="text-muted-foreground">Bytes Recv</div>
-              <div className="font-mono">{flow?.bytes_recv ?? '—'}</div>
-              <div className="text-muted-foreground">MSS</div>
-              <div className="font-mono">{flow?.mss ?? 'n/a'}</div>
-              <div className="text-muted-foreground">Fragments</div>
-              <div className="font-mono">{flow?.fragment_count ?? '—'}</div>
+              <div className="text-muted-foreground">TLS Version</div>
+              <div className="font-mono">{flow?.tls_version ?? 'n/a'}</div>
+              <div className="text-muted-foreground">ClientHello</div>
+              <div className="font-mono">{flow?.tls_client_hello ? 'yes' : 'no'}</div>
+              <div className="text-muted-foreground">ServerHello</div>
+              <div className="font-mono">{flow?.tls_server_hello ? 'yes' : 'no'}</div>
+              <div className="text-muted-foreground">TLS Alert</div>
+              <div className="font-mono">{flow?.tls_alert ? 'yes' : 'no'}</div>
+              <div className="text-muted-foreground">SNI</div>
+              <div className="font-mono">{flow?.tls_sni ?? 'n/a'}</div>
+              <div className="text-muted-foreground">ALPN</div>
+              <div className="font-mono">{flow?.alpn ?? 'n/a'}</div>
+              <div className="text-muted-foreground">HTTP</div>
+              <div className="font-mono">
+                {flow?.http_method ? `${flow.http_method} ${flow.http_host || ''}` : 'n/a'}
+              </div>
             </div>
           </Panel>
         </div>
+
+        <Panel className="p-4">
+          <div className="text-sm font-semibold">Metrics, MSS/MTU, Flags</div>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm mt-2">
+            <div className="text-muted-foreground">Bytes Sent</div>
+            <div className="font-mono">{flow?.bytes_sent ?? '—'}</div>
+            <div className="text-muted-foreground">Bytes Recv</div>
+            <div className="font-mono">{flow?.bytes_recv ?? '—'}</div>
+            <div className="text-muted-foreground">Throughput</div>
+            <div className="font-mono">{typeof flow?.throughput_bps === 'number' ? `${Math.round(flow.throughput_bps)} B/s` : 'n/a'}</div>
+            <div className="text-muted-foreground">MSS</div>
+            <div className="font-mono">{mss ?? 'n/a'}</div>
+            <div className="text-muted-foreground">Est. MTU (v4/v6)</div>
+            <div className="font-mono">{mss ? `${mtuV4} / ${mtuV6}` : 'n/a'}</div>
+            <div className="text-muted-foreground">Retransmits</div>
+            <div className="font-mono">{flow?.retransmits ?? 0}</div>
+            <div className="text-muted-foreground">Out-of-Order</div>
+            <div className="font-mono">{flow?.out_of_order ?? 0}</div>
+            <div className="text-muted-foreground">RSTs</div>
+            <div className="font-mono">{flow?.rst_count ?? 0}</div>
+            <div className="text-muted-foreground">Fragments</div>
+            <div className="font-mono">{flow?.fragment_count ?? 0}</div>
+          </div>
+        </Panel>
 
         <Panel className="p-4">
           <div className="flex items-center justify-between mb-2">

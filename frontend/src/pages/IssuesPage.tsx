@@ -11,6 +11,74 @@ import { Select } from '../components/ui/select'
 import { Badge } from '../components/ui/badge'
 import { Skeleton } from '../components/ui/skeleton'
 
+type InlineToken = { type: 'text' | 'bold' | 'italic' | 'code'; value: string }
+
+function tokenizeInline(text: string): InlineToken[] {
+  const regex = /(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)/g
+  const parts = text.split(regex).filter((part) => part !== '')
+  return parts.map((part) => {
+    if (part.startsWith('**') && part.endsWith('**')) {
+      return { type: 'bold', value: part.slice(2, -2) }
+    }
+    if (part.startsWith('*') && part.endsWith('*')) {
+      return { type: 'italic', value: part.slice(1, -1) }
+    }
+    if (part.startsWith('`') && part.endsWith('`')) {
+      return { type: 'code', value: part.slice(1, -1) }
+    }
+    return { type: 'text', value: part }
+  })
+}
+
+function renderDecoratedText(text: string) {
+  const lines = text.split('\n')
+  const headingRegex = /^(summary|likely causes|next steps|confidence|diagnosis|observations|recommendations)\b[:\-]?/i
+
+  return (
+    <div className="space-y-2">
+      {lines.map((line, idx) => {
+        const trimmed = line.trim()
+        if (!trimmed) {
+          return <div key={idx} className="h-2" />
+        }
+        const isHeading = headingRegex.test(trimmed)
+        const tokens = tokenizeInline(trimmed)
+        return (
+          <div
+            key={idx}
+            className={isHeading ? 'text-xs uppercase tracking-wide text-primary font-semibold' : 'text-sm text-foreground/90'}
+          >
+            {tokens.map((token, tIdx) => {
+              if (token.type === 'bold') {
+                return (
+                  <strong key={tIdx} className="font-semibold text-foreground">
+                    {token.value}
+                  </strong>
+                )
+              }
+              if (token.type === 'italic') {
+                return (
+                  <em key={tIdx} className="italic text-foreground/90">
+                    {token.value}
+                  </em>
+                )
+              }
+              if (token.type === 'code') {
+                return (
+                  <code key={tIdx} className="px-1 py-0.5 rounded-sm border border-border bg-secondary/40 font-mono text-xs">
+                    {token.value}
+                  </code>
+                )
+              }
+              return <span key={tIdx}>{token.value}</span>
+            })}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 export default function IssuesPage() {
   const [searchParams] = useSearchParams()
   const initialPcap = searchParams.get('pcap') || ''
@@ -152,24 +220,40 @@ export default function IssuesPage() {
         </div>
       </div>
 
-      <AnimatedDialog open={explainOpen} onClose={() => setExplainOpen(false)} title="AI Explanation">
-        {explainLoading ? (
-          <div className="flex items-center justify-center gap-2 py-6">
-            <Skeleton className="h-4 w-24" />
-            <span className="text-sm text-muted-foreground">Generating explanation...</span>
+      <AnimatedDialog
+        open={explainOpen}
+        onClose={() => setExplainOpen(false)}
+        title="AI Explanation"
+        bodyClassName="overflow-hidden"
+        panelClassName="max-w-6xl w-[95vw]"
+      >
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,65%)_minmax(0,35%)] gap-4 h-[70vh]">
+          <div className="border border-border rounded-md p-3 overflow-auto">
+            <div className="text-xs uppercase text-muted-foreground mb-2">AI Explanation</div>
+            {explainLoading ? (
+              <div className="flex items-center gap-2">
+                <Skeleton className="h-4 w-24" />
+                <span className="text-sm text-muted-foreground">Generating explanation...</span>
+              </div>
+            ) : explanation ? (
+              renderDecoratedText(explanation.response || '')
+            ) : (
+              <div className="text-sm text-muted-foreground">No explanation yet.</div>
+            )}
           </div>
-        ) : explanation ? (
-          <div className="space-y-2 text-sm">
-            <div className="font-semibold">AI Response</div>
-            <div className="whitespace-pre-wrap">{explanation.response}</div>
-            <div className="font-semibold pt-2">Data Shared</div>
-            <pre className="text-xs bg-secondary/30 border border-border rounded p-2 overflow-auto">
-              {JSON.stringify(explanation.shared, null, 2)}
-            </pre>
+          <div className="border border-border rounded-md p-3 overflow-auto">
+            <div className="text-xs uppercase text-muted-foreground mb-2">Data Shared to AI</div>
+            {explainLoading ? (
+              <div className="text-sm text-muted-foreground">Waiting for response...</div>
+            ) : explanation ? (
+              <pre className="text-xs whitespace-pre-wrap">
+                {JSON.stringify(explanation.shared, null, 2)}
+              </pre>
+            ) : (
+              <div className="text-sm text-muted-foreground">No data shared.</div>
+            )}
           </div>
-        ) : (
-          <div className="text-sm text-muted-foreground">No explanation yet.</div>
-        )}
+        </div>
       </AnimatedDialog>
     </Page>
   )
