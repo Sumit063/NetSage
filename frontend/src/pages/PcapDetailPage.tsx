@@ -51,6 +51,8 @@ export default function PcapDetailPage() {
     border: '1px solid hsl(var(--border))',
     color: 'hsl(var(--foreground))'
   }
+  const tooltipLabelStyle = { color: 'hsl(var(--foreground))' }
+  const tooltipItemStyle = { color: 'hsl(var(--foreground))' }
   const protocolPie = summary
     ? [
         { name: 'TCP', value: summary.tcp_flows || 0 },
@@ -107,7 +109,7 @@ export default function PcapDetailPage() {
               {protocolPie.length ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
-                    <Tooltip contentStyle={tooltipStyle} />
+                    <Tooltip contentStyle={tooltipStyle} labelStyle={tooltipLabelStyle} itemStyle={tooltipItemStyle} />
                     <Pie
                       data={protocolPie}
                       dataKey="value"
@@ -146,7 +148,7 @@ export default function PcapDetailPage() {
               {issuePie.length ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
-                    <Tooltip contentStyle={tooltipStyle} />
+                    <Tooltip contentStyle={tooltipStyle} labelStyle={tooltipLabelStyle} itemStyle={tooltipItemStyle} />
                     <Pie
                       data={issuePie}
                       dataKey="value"
@@ -199,7 +201,7 @@ export default function PcapDetailPage() {
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                   <XAxis dataKey="key" tick={false} label={{ value: 'Talker', position: 'insideBottom', offset: -4, ...axisLabel }} />
                   <YAxis tick={axisTick} label={{ value: 'Bytes', angle: -90, position: 'insideLeft', ...axisLabel }} />
-                  <Tooltip contentStyle={tooltipStyle} />
+                  <Tooltip contentStyle={tooltipStyle} labelStyle={tooltipLabelStyle} itemStyle={tooltipItemStyle} />
                   <Line type="monotone" dataKey="value" stroke="hsl(var(--chart-1))" strokeWidth={2} dot={false} />
                 </LineChart>
               </ResponsiveContainer>
@@ -213,7 +215,7 @@ export default function PcapDetailPage() {
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                   <XAxis dataKey="bucket" tick={axisTick} label={{ value: 'RTT bucket (ms)', position: 'insideBottom', offset: -4, ...axisLabel }} />
                   <YAxis tick={axisTick} label={{ value: 'Count', angle: -90, position: 'insideLeft', ...axisLabel }} />
-                  <Tooltip contentStyle={tooltipStyle} />
+                  <Tooltip contentStyle={tooltipStyle} labelStyle={tooltipLabelStyle} itemStyle={tooltipItemStyle} />
                   <Line type="monotone" dataKey="count" stroke="hsl(var(--chart-3))" strokeWidth={2} dot={false} />
                 </LineChart>
               </ResponsiveContainer>
@@ -230,7 +232,7 @@ export default function PcapDetailPage() {
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                   <XAxis dataKey="day" tick={axisTick} label={{ value: 'Date', position: 'insideBottom', offset: -4, ...axisLabel }} />
                   <YAxis allowDecimals={false} tick={axisTick} label={{ value: 'Issues', angle: -90, position: 'insideLeft', ...axisLabel }} />
-                  <Tooltip contentStyle={tooltipStyle} />
+                  <Tooltip contentStyle={tooltipStyle} labelStyle={tooltipLabelStyle} itemStyle={tooltipItemStyle} />
                   <Line type="monotone" dataKey="count" stroke="hsl(var(--chart-2))" strokeWidth={2} dot={false} />
                 </LineChart>
               </ResponsiveContainer>

@@ -70,6 +70,7 @@ func (s *Server) Routes() http.Handler {
 			r.Post("/pcaps/upload", s.handleUploadPCAP)
 			r.Get("/pcaps", s.handleListPCAPs)
 			r.Get("/pcaps/{id}", s.handleGetPCAP)
+			r.Delete("/pcaps/{id}", s.handleDeletePCAP)
 			r.Get("/pcaps/{id}/jobs", s.handleListJobsForPCAP)
 			r.Get("/jobs/{id}", s.handleGetJob)
 			r.Get("/pcaps/{id}/flows", s.handleListFlows)

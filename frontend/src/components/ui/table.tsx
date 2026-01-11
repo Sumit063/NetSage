@@ -22,9 +22,9 @@ export function Tr(props: React.HTMLAttributes<HTMLTableRowElement>) {
 }
 
 export function Th(props: React.ThHTMLAttributes<HTMLTableCellElement>) {
-  return <th className="text-left px-3 py-2 font-medium text-foreground/80 border-b border-border" {...props} />
+  return <th className="text-left px-4 py-3 font-medium text-foreground/80 border-b border-border" {...props} />
 }
 
 export function Td(props: React.TdHTMLAttributes<HTMLTableCellElement>) {
-  return <td className="px-3 py-2 align-middle text-foreground/90" {...props} />
+  return <td className="px-4 py-3 align-middle text-foreground/90" {...props} />
 }

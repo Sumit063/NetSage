@@ -53,6 +53,9 @@ export const api = {
   getPcap(id: string) {
     return apiFetch<any>(`/api/pcaps/${id}`)
   },
+  deletePcap(id: string) {
+    return apiFetch<{ status: string }>(`/api/pcaps/${id}`, { method: 'DELETE' })
+  },
   uploadPcap(file: File) {
     const form = new FormData()
     form.append('pcap', file)

@@ -10,10 +10,13 @@ import { Input } from '../components/ui/input'
 import { Badge } from '../components/ui/badge'
 import { Table, Tbody, Td, Th, Thead, Tr } from '../components/ui/table'
 import { Skeleton } from '../components/ui/skeleton'
+import { ExternalLink, Trash2 } from 'lucide-react'
+import { ConfirmDialog } from '../components/ui/confirm-dialog'
 
-function PcapCard({ pcap }: { pcap: any }) {
+function PcapCard({ pcap, onDelete }: { pcap: any; onDelete: (pcap: any) => void }) {
   const { data: jobs } = useQuery({ queryKey: ['jobs', pcap.id], queryFn: () => api.listJobs(String(pcap.id)) })
   const latest = jobs && jobs.length > 0 ? jobs[0] : null
+  const progress = latest?.progress ?? 0
 
   return (
     <Tr>
@@ -23,20 +26,34 @@ function PcapCard({ pcap }: { pcap: any }) {
       <Td className="text-muted-foreground">{new Date(pcap.uploaded_at).toLocaleString()}</Td>
       <Td className="text-muted-foreground">
         {latest ? (
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-mono">{latest.status}</span>
-            <div className="h-2 w-24 rounded-sm bg-muted overflow-hidden">
-              <div className="h-full bg-primary" style={{ width: `${latest.progress || 0}%` }} />
+          <div className="flex items-center gap-3">
+            <div className="text-xs font-mono uppercase tracking-wide">{latest.status}</div>
+            <div className="h-2 w-32 rounded-sm bg-muted/70 overflow-hidden border border-border">
+              <div className="h-full bg-primary" style={{ width: `${progress}%` }} />
             </div>
+            <div className="text-xs font-mono text-muted-foreground w-10 text-right">{Math.round(progress)}%</div>
           </div>
         ) : (
           <span className="text-xs text-muted-foreground">Pending analysis</span>
         )}
       </Td>
-      <Td className="text-right whitespace-nowrap w-[80px]">
-        <Link to={`/pcaps/${pcap.id}`} className="text-primary text-sm underline">
-          Open
-        </Link>
+      <Td className="text-right whitespace-nowrap w-[140px]">
+        <div className="flex items-center justify-end gap-2">
+          <Button variant="ghost" size="icon" asChild>
+            <Link to={`/pcaps/${pcap.id}`} aria-label="Open capture" title="Open">
+              <ExternalLink size={16} />
+            </Link>
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => onDelete(pcap)}
+            aria-label="Delete capture"
+            title="Delete"
+          >
+            <Trash2 size={16} />
+          </Button>
+        </div>
       </Td>
     </Tr>
   )
@@ -46,6 +63,7 @@ export default function PcapsPage() {
   const [file, setFile] = useState<File | null>(null)
   const queryClient = useQueryClient()
   const [search, setSearch] = useState('')
+  const [deleteTarget, setDeleteTarget] = useState<any | null>(null)
 
   const { data: pcaps, isLoading } = useQuery({ queryKey: ['pcaps'], queryFn: api.listPcaps })
 
@@ -56,6 +74,24 @@ export default function PcapsPage() {
       queryClient.invalidateQueries({ queryKey: ['pcaps'] })
     }
   })
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => api.deletePcap(String(id)),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pcaps'] })
+    }
+  })
+
+  const handleDelete = (pcap: any) => {
+    setDeleteTarget(pcap)
+  }
+
+  const confirmDelete = () => {
+    if (!deleteTarget || deleteMutation.isPending) return
+    deleteMutation.mutate(deleteTarget.id, {
+      onSuccess: () => setDeleteTarget(null)
+    })
+  }
 
   const onUpload = () => {
     if (file) {
@@ -130,18 +166,18 @@ export default function PcapsPage() {
               <Skeleton className="h-10 w-full" />
             </div>
           ) : (
-            <Table className="min-w-[640px]">
+            <Table className="min-w-[700px]">
               <Thead>
                 <Tr>
                   <Th>Filename</Th>
                   <Th>Uploaded</Th>
                   <Th>Status</Th>
-                  <Th className="text-right whitespace-nowrap w-[80px]">Action</Th>
+                  <Th className="text-right whitespace-nowrap w-[160px] pr-6">Actions</Th>
                 </Tr>
               </Thead>
               <Tbody>
                 {filtered.map((pcap: any) => (
-                  <PcapCard key={pcap.id} pcap={pcap} />
+                  <PcapCard key={pcap.id} pcap={pcap} onDelete={handleDelete} />
                 ))}
                 {!filtered.length && (
                   <Tr>
@@ -155,6 +191,20 @@ export default function PcapsPage() {
           )}
         </Panel>
       </div>
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => (!open ? setDeleteTarget(null) : null)}
+        title="Delete capture?"
+        description={
+          deleteTarget
+            ? `Delete ${deleteTarget.filename} and all derived flows/issues? This cannot be undone.`
+            : 'Delete this capture and all derived flows/issues?'
+        }
+        confirmText={deleteMutation.isPending ? 'Deleting...' : 'Delete'}
+        confirmDisabled={deleteMutation.isPending}
+        onConfirm={confirmDelete}
+      />
     </Page>
   )
 }

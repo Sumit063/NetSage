@@ -92,6 +92,19 @@ paths:
       responses:
         '200':
           description: PCAP detail
+    delete:
+      security:
+        - bearerAuth: []
+      summary: Delete PCAP
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Deleted
   /api/pcaps/{id}/jobs:
     get:
       security:

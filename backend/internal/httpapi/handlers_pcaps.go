@@ -119,3 +119,37 @@ func (s *Server) handleGetPCAP(w http.ResponseWriter, r *http.Request) {
         "job_count": jobCount,
     })
 }
+
+func (s *Server) handleDeletePCAP(w http.ResponseWriter, r *http.Request) {
+	user, ok := getUser(r.Context())
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+		return
+	}
+
+	id, err := strconv.Atoi(chiURLParam(r, "id"))
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid id"})
+		return
+	}
+
+	var pcap db.Pcap
+	if err := s.store.DB.Where("id = ? AND user_id = ?", id, user.ID).First(&pcap).Error; err != nil {
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "not found"})
+		return
+	}
+
+	if pcap.StoragePath != "" {
+		if err := os.Remove(pcap.StoragePath); err != nil && !os.IsNotExist(err) {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "delete file failed"})
+			return
+		}
+	}
+
+	if err := s.store.DB.Delete(&pcap).Error; err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db error"})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
+}
