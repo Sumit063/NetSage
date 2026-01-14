@@ -1,0 +1,27 @@
+id: tls_handshake_failure
+issue_type: TLS_HANDSHAKE_FAILURE
+title: TLS handshake failure
+summary: "TLS ClientHello observed without ServerHello or an alert was seen (tls_alert_seen={{.tls_alert_seen}})."
+conditions:
+  any:
+    - metric: tls_alert_seen
+      op: eq
+      value: true
+    - all:
+        - metric: tls_client_hello_seen
+          op: eq
+          value: true
+        - metric: tls_server_hello_seen
+          op: eq
+          value: false
+        - metric: duration_ms
+          op: gte
+          value: 1000
+severity:
+  base: 4
+  steps:
+    - severity: 5
+      when:
+        metric: tls_alert_seen
+        op: eq
+        value: true

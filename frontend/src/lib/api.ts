@@ -81,14 +81,31 @@ export const api = {
   listFlows(pcapId: string) {
     return apiFetch<any[]>(`/api/pcaps/${pcapId}/flows`)
   },
+  listJobFlows(jobId: string, params?: Record<string, string | number | undefined>) {
+    const search = new URLSearchParams()
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value === undefined || value === null || value === '') return
+        search.set(key, String(value))
+      })
+    }
+    const qs = search.toString()
+    return apiFetch<any[]>(`/api/jobs/${jobId}/flows${qs ? `?${qs}` : ''}`)
+  },
   getFlow(flowId: string) {
     return apiFetch<any>(`/api/flows/${flowId}`)
   },
   listIssues(pcapId: string) {
     return apiFetch<any[]>(`/api/pcaps/${pcapId}/issues`)
   },
+  listJobIssues(jobId: string) {
+    return apiFetch<any[]>(`/api/jobs/${jobId}/issues`)
+  },
   listIssuesForFlow(pcapId: string, flowId: string) {
     return apiFetch<any[]>(`/api/pcaps/${pcapId}/issues?flow_id=${flowId}`)
+  },
+  getIssue(issueId: string) {
+    return apiFetch<any>(`/api/issues/${issueId}`)
   },
   getStats(pcapId: string) {
     return apiFetch<any>(`/api/pcaps/${pcapId}/stats`)

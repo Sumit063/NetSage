@@ -1,0 +1,38 @@
+id: retransmission
+issue_type: RETRANSMISSION
+title: Retransmissions detected
+summary: "Retransmissions observed (tcp_retransmissions={{.tcp_retransmissions}}, tcp_syn_retransmissions={{.tcp_syn_retransmissions}}, dup_acks={{.dup_acks}})."
+conditions:
+  any:
+    - metric: tcp_retransmissions
+      op: gte
+      value: 3
+    - metric: tcp_syn_retransmissions
+      op: gte
+      value: 2
+    - metric: dup_acks
+      op: gte
+      value: 5
+severity:
+  base: 3
+  steps:
+    - severity: 4
+      when:
+        metric: tcp_retransmissions
+        op: gte
+        value: 10
+    - severity: 5
+      when:
+        metric: tcp_retransmissions
+        op: gte
+        value: 25
+    - severity: 4
+      when:
+        metric: tcp_syn_retransmissions
+        op: gte
+        value: 3
+    - severity: 4
+      when:
+        metric: dup_acks
+        op: gte
+        value: 10

@@ -14,25 +14,25 @@ import (
 )
 
 type Result struct {
-    Flows          map[flows.FlowKey]*flows.FlowAgg
-    RTTHistogram   *flows.Histogram
-    PacketCount    int64
-    BytesProcessed int64
+	Flows          map[flows.FlowKey]*flows.FlowAgg
+	RTTHistogram   *flows.Histogram
+	PacketCount    int64
+	BytesProcessed int64
 }
 
 type ProgressFunc func(bytesRead, totalBytes int64)
 
 func AnalyzeFile(ctx context.Context, path string, onProgress ProgressFunc) (*Result, error) {
-    file, err := os.Open(path)
-    if err != nil {
-        return nil, err
-    }
-    defer file.Close()
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
 
-    stat, err := file.Stat()
-    if err != nil {
-        return nil, err
-    }
+	stat, err := file.Stat()
+	if err != nil {
+		return nil, err
+	}
 
 	progress := &progressReader{r: file}
 	buffered := bufio.NewReader(progress)
@@ -177,6 +177,7 @@ func parsePacket(packet gopacket.Packet) (flows.PacketInfo, bool) {
 		info.DstPort = int(tcp.DstPort)
 		info.PayloadLen = len(tcp.Payload)
 		info.Seq = tcp.Seq
+		info.Ack = tcp.Ack
 		info.TCPFlags = flows.TCPFlags{SYN: tcp.SYN, ACK: tcp.ACK, FIN: tcp.FIN, RST: tcp.RST}
 
 		if tcp.SYN {
@@ -189,13 +190,14 @@ func parsePacket(packet gopacket.Packet) (flows.PacketInfo, bool) {
 		}
 
 		if len(tcp.Payload) > 0 {
-			sni, version, alpn, clientHello, serverHello, alert := parseTLS(tcp.Payload)
+			sni, version, alpn, clientHello, serverHello, alert, alertCode := parseTLS(tcp.Payload)
 			info.TLSSNI = sni
 			info.TLSVersion = version
 			info.ALPN = alpn
 			info.TLSClientHello = clientHello
 			info.TLSServerHello = serverHello
 			info.TLSAlert = alert
+			info.TLSAlertCode = alertCode
 
 			method, host := parseHTTP(tcp.Payload)
 			info.HTTPMethod = method
@@ -217,7 +219,7 @@ func parsePacket(packet gopacket.Packet) (flows.PacketInfo, bool) {
 	return info, false
 }
 
-func parseTLS(payload []byte) (*string, *string, *string, bool, bool, bool) {
+func parseTLS(payload []byte) (*string, *string, *string, bool, bool, bool, *int) {
 	info := tlsInfo{payload: payload}
 	return info.Parse()
 }

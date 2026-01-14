@@ -4,6 +4,7 @@ import PcapsPage from './pages/PcapsPage'
 import PcapDetailPage from './pages/PcapDetailPage'
 import FlowDetailPage from './pages/FlowDetailPage'
 import IssuesPage from './pages/IssuesPage'
+import TriagePage from './pages/TriagePage'
 import { Shell } from './components/Shell'
 import { RequireAuth } from './components/RequireAuth'
 
@@ -57,6 +58,16 @@ export default function App() {
           <RequireAuth>
             <Shell>
               <IssuesPage />
+            </Shell>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/jobs/:id/triage"
+        element={
+          <RequireAuth>
+            <Shell>
+              <TriagePage />
             </Shell>
           </RequireAuth>
         }

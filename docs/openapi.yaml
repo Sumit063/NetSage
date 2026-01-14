@@ -144,9 +144,63 @@ paths:
           required: true
           schema:
             type: integer
+        - name: client_ip
+          in: query
+          schema:
+            type: string
+        - name: server_ip
+          in: query
+          schema:
+            type: string
+        - name: port
+          in: query
+          schema:
+            type: integer
+        - name: tcp_stream
+          in: query
+          schema:
+            type: integer
+        - name: stream
+          in: query
+          schema:
+            type: integer
       responses:
         '200':
           description: Flow list
+  /api/jobs/{id}/flows:
+    get:
+      security:
+        - bearerAuth: []
+      summary: List flows for job
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: client_ip
+          in: query
+          schema:
+            type: string
+        - name: server_ip
+          in: query
+          schema:
+            type: string
+        - name: port
+          in: query
+          schema:
+            type: integer
+        - name: tcp_stream
+          in: query
+          schema:
+            type: integer
+        - name: stream
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Flow list for job
   /api/flows/{id}:
     get:
       security:
@@ -175,8 +229,38 @@ paths:
         - name: severity
           in: query
           schema:
+            type: integer
+        - name: issue_type
+          in: query
+          schema:
             type: string
-        - name: type
+        - name: job_id
+          in: query
+          schema:
+            type: integer
+        - name: flow_id
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Issue list (latest job by default)
+  /api/jobs/{id}/issues:
+    get:
+      security:
+        - bearerAuth: []
+      summary: List issues for job
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: severity
+          in: query
+          schema:
+            type: integer
+        - name: issue_type
           in: query
           schema:
             type: string
@@ -186,7 +270,7 @@ paths:
             type: integer
       responses:
         '200':
-          description: Issue list
+          description: Issue list for job
   /api/pcaps/{id}/stats:
     get:
       security:
@@ -229,6 +313,20 @@ paths:
       responses:
         '200':
           description: Explanation
+  /api/issues/{id}:
+    get:
+      security:
+        - bearerAuth: []
+      summary: Get issue detail
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Issue detail with evidence
   /api/flows/{id}/cert-inspect:
     post:
       security:

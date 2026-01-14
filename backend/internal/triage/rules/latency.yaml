@@ -1,0 +1,35 @@
+id: latency
+issue_type: LATENCY
+title: High flow latency
+summary: "Latency exceeds thresholds (duration {{printf \"%.0f\" .duration_ms}} ms, handshake RTT {{printf \"%.0f\" .handshake_rtt_ms_estimate}} ms)."
+conditions:
+  any:
+    - metric: duration_ms
+      op: gt
+      value: 2000
+    - metric: handshake_rtt_ms_estimate
+      op: gt
+      value: 500
+severity:
+  base: 3
+  steps:
+    - severity: 4
+      when:
+        metric: duration_ms
+        op: gte
+        value: 2000
+    - severity: 5
+      when:
+        metric: duration_ms
+        op: gte
+        value: 5000
+    - severity: 4
+      when:
+        metric: handshake_rtt_ms_estimate
+        op: gte
+        value: 500
+    - severity: 5
+      when:
+        metric: handshake_rtt_ms_estimate
+        op: gte
+        value: 1000

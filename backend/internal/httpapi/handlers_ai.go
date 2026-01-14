@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 
@@ -28,44 +29,28 @@ func (s *Server) handleExplainIssue(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var flow db.Flow
-	if issue.FlowID != nil {
-		_ = s.store.DB.Where("id = ? AND user_id = ?", *issue.FlowID, user.ID).First(&flow).Error
+	var evidence []db.IssueEvidence
+	if err := s.store.DB.Where("issue_id = ?", issue.ID).Find(&evidence).Error; err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db error"})
+		return
 	}
 
-	evidence := map[string]interface{}{}
-	_ = json.Unmarshal([]byte(issue.EvidenceJSON), &evidence)
-
-	flowInfo := map[string]interface{}{}
-	if flow.ID != 0 {
-		flowInfo["proto"] = flow.Proto
-		flowInfo["src_ip"] = flow.SrcIP
-		flowInfo["dst_ip"] = flow.DstIP
-		flowInfo["src_port"] = flow.SrcPort
-		flowInfo["dst_port"] = flow.DstPort
-		flowInfo["rtt_ms"] = flow.RTTMs
-		flowInfo["retransmits"] = flow.Retransmits
-		flowInfo["out_of_order"] = flow.OutOfOrder
-		flowInfo["mss"] = flow.MSS
-		flowInfo["tls_version"] = flow.TLSVersion
-		flowInfo["tls_sni"] = flow.TLSSNI
-		flowInfo["alpn"] = flow.ALPN
-		flowInfo["tls_client_hello"] = flow.TLSClientHello
-		flowInfo["tls_server_hello"] = flow.TLSServerHello
-		flowInfo["tls_alert"] = flow.TLSAlert
-		flowInfo["rst_count"] = flow.RSTCount
-		flowInfo["fragment_count"] = flow.FragmentCount
-		flowInfo["throughput_bps"] = flow.ThroughputBps
+	metrics := map[string]interface{}{}
+	if issue.PrimaryFlowID != nil {
+		for _, ev := range evidence {
+			if ev.FlowID == *issue.PrimaryFlowID {
+				metrics = decodeMetrics(ev.MetricsJSON)
+				break
+			}
+		}
+	}
+	if len(metrics) == 0 && len(evidence) > 0 {
+		metrics = decodeMetrics(evidence[0].MetricsJSON)
 	}
 
-	summary := ai.IssueSummary{
-		IssueID:     issue.ID,
-		Severity:    issue.Severity,
-		Type:        issue.Type,
-		Title:       issue.Title,
-		Description: issue.Description,
-		Evidence:    evidence,
-		Flow:        flowInfo,
+	summary := ai.TriageSummary{
+		IssueType: issue.IssueType,
+		Metrics:   metrics,
 	}
 
 	hash, err := ai.HashSummary(summary)
@@ -77,38 +62,80 @@ func (s *Server) handleExplainIssue(w http.ResponseWriter, r *http.Request) {
 	var existing db.AIExplanation
 	if err := s.store.DB.Where("issue_id = ? AND user_id = ? AND prompt_hash = ?", issue.ID, user.ID, hash).
 		First(&existing).Error; err == nil {
+		explanation, err := decodeAIExplanation(existing.ResponseText)
+		if err == nil {
+			writeJSON(w, http.StatusOK, map[string]interface{}{
+				"issue_id":    issue.ID,
+				"model":       existing.Model,
+				"response":    explanation,
+				"prompt_hash": hash,
+				"shared":      summary,
+				"cached":      true,
+				"valid":       true,
+			})
+			return
+		}
+	}
+
+	explanation, model, err := s.aiClient.Explain(r.Context(), hash, summary)
+	if err != nil {
+		fallback := deterministicExplanation(issue.Summary)
 		writeJSON(w, http.StatusOK, map[string]interface{}{
 			"issue_id":    issue.ID,
-			"model":       existing.Model,
-			"response":    existing.ResponseText,
+			"model":       model,
+			"response":    fallback,
 			"prompt_hash": hash,
 			"shared":      summary,
-			"cached":      true,
+			"cached":      false,
+			"valid":       false,
 		})
 		return
 	}
 
-	answer, model, err := s.aiClient.Explain(r.Context(), hash, summary)
-	if err != nil {
-		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "ai request failed"})
-		return
+	encoded, err := json.Marshal(explanation)
+	if err == nil {
+		explanationRecord := db.AIExplanation{
+			IssueID:      issue.ID,
+			UserID:       user.ID,
+			PromptHash:   hash,
+			Model:        model,
+			ResponseText: string(encoded),
+		}
+		_ = s.store.DB.Create(&explanationRecord).Error
 	}
-
-	explanation := db.AIExplanation{
-		IssueID:      issue.ID,
-		UserID:       user.ID,
-		PromptHash:   hash,
-		Model:        model,
-		ResponseText: answer,
-	}
-	_ = s.store.DB.Create(&explanation).Error
 
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"issue_id":    issue.ID,
 		"model":       model,
-		"response":    answer,
+		"response":    explanation,
 		"prompt_hash": hash,
 		"shared":      summary,
 		"cached":      false,
+		"valid":       true,
 	})
+}
+
+func decodeAIExplanation(raw string) (ai.Explanation, error) {
+	var exp ai.Explanation
+	if err := json.Unmarshal([]byte(raw), &exp); err != nil {
+		return ai.Explanation{}, err
+	}
+	if exp.Explanation == "" {
+		return ai.Explanation{}, errors.New("missing explanation")
+	}
+	if exp.PossibleCauses == nil {
+		exp.PossibleCauses = []string{}
+	}
+	if exp.NextSteps == nil {
+		exp.NextSteps = []string{}
+	}
+	return exp, nil
+}
+
+func deterministicExplanation(summary string) ai.Explanation {
+	return ai.Explanation{
+		Explanation:    summary,
+		PossibleCauses: []string{},
+		NextSteps:      []string{},
+	}
 }

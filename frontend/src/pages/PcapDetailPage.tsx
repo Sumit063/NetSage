@@ -1,11 +1,11 @@
 import { useQuery } from '@tanstack/react-query'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { api } from '../lib/api'
 import { CartesianGrid, Cell, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { Page } from '../components/Page'
 import { Panel } from '../components/Panel'
 import { Button } from '../components/ui/button'
-import { Badge } from '../components/ui/badge'
+import { Tabs } from '../components/ui/tabs'
 import { Skeleton } from '../components/ui/skeleton'
 
 function parseJsonField<T>(value: string | null): T {
@@ -19,11 +19,13 @@ function parseJsonField<T>(value: string | null): T {
 
 export default function PcapDetailPage() {
   const { id } = useParams()
+  const navigate = useNavigate()
 
   const { data: summary } = useQuery({ queryKey: ['summary', id], queryFn: () => api.getSummary(id!) })
   const { data: stats } = useQuery({ queryKey: ['stats', id], queryFn: () => api.getStats(id!) })
   const { data: flows } = useQuery({ queryKey: ['flows', id], queryFn: () => api.listFlows(id!) })
   const { data: issues } = useQuery({ queryKey: ['issues', id], queryFn: () => api.listIssues(id!) })
+  const { data: jobs } = useQuery({ queryKey: ['jobs', id], queryFn: () => api.listJobs(id!), enabled: !!id })
 
   const topTalkers = parseJsonField<any[]>(stats?.top_talkers_json)
   const topFlows = parseJsonField<any[]>(stats?.top_flows_json)
@@ -66,6 +68,9 @@ export default function PcapDetailPage() {
         { name: 'LOW', value: summary.issues?.LOW || 0 }
       ]
     : []
+  const latestJob = jobs && jobs.length > 0 ? jobs[0] : null
+
+  const triageTabDisabled = !latestJob
 
   const renderPieLabel = (props: { cx: number; cy: number; midAngle: number; outerRadius: number; name: string; value: number }) => {
     const radius = props.outerRadius + 14
@@ -81,10 +86,31 @@ export default function PcapDetailPage() {
   return (
     <Page>
       <div className="space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <Tabs
+          value="overview"
+          onValueChange={(val) => {
+            if (val === 'triage' && latestJob) {
+              navigate(`/jobs/${latestJob.id}/triage`)
+            }
+          }}
+          tabs={[
+            { value: 'overview', label: 'Overview' },
+            { value: 'triage', label: 'Triage', disabled: triageTabDisabled }
+          ]}
+        />
+
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
           <Panel className="p-4">
-            <div className="text-xs uppercase text-muted-foreground">Total Flows</div>
-            <div className="text-2xl font-semibold">{summary?.total_flows ?? <Skeleton className="h-6 w-20" />}</div>
+            <div className="text-xs uppercase text-muted-foreground">Streams</div>
+            <div className="text-2xl font-semibold">
+              {summary ? (summary.stream_count ?? summary.total_flows) : <Skeleton className="h-6 w-20" />}
+            </div>
+          </Panel>
+          <Panel className="p-4">
+            <div className="text-xs uppercase text-muted-foreground">TCP Streams</div>
+            <div className="text-2xl font-semibold">
+              {summary ? (summary.tcp_streams ?? summary.tcp_flows ?? 0) : <Skeleton className="h-6 w-20" />}
+            </div>
           </Panel>
           <Panel className="p-4">
             <div className="text-xs uppercase text-muted-foreground">TCP / UDP</div>
@@ -255,19 +281,21 @@ export default function PcapDetailPage() {
         <Panel className="p-4">
           <div className="flex items-center justify-between mb-3">
             <div className="text-sm font-semibold">Recent Flows</div>
-            <Button variant="outline" asChild>
-              <Link to={`/issues?pcap=${id}`}>View Issues</Link>
-            </Button>
+            {latestJob ? (
+              <Button variant="outline" asChild>
+                <Link to={`/jobs/${latestJob.id}/triage`}>Open Triage</Link>
+              </Button>
+            ) : null}
           </div>
           <div className="space-y-2">
             {flows?.slice(0, 10).map((flow: any) => (
               <div key={flow.id} className="flex items-center justify-between border border-border rounded-md p-2">
                 <div>
                   <div className="text-sm font-medium">
-                    {flow.src_ip}:{flow.src_port} → {flow.dst_ip}:{flow.dst_port} ({flow.proto})
+                    {flow.client_ip}:{flow.client_port} → {flow.server_ip}:{flow.server_port} ({flow.protocol})
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    RTT {typeof flow.rtt_ms === 'number' ? flow.rtt_ms.toFixed(1) : 'n/a'} ms · Retrans {flow.retransmits}
+                    RTT {typeof flow.handshake_rtt_ms_estimate === 'number' ? flow.handshake_rtt_ms_estimate.toFixed(1) : 'n/a'} ms · Retrans {flow.tcp_retransmissions}
                   </div>
                 </div>
                 <Button variant="ghost" size="sm" asChild>

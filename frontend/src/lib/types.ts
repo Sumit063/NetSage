@@ -13,22 +13,36 @@ export type Job = {
 
 export type Flow = {
   id: number
-  proto: string
+  protocol: string
   src_ip: string
   dst_ip: string
   src_port: number
   dst_port: number
-  first_seen?: string
-  last_seen?: string
+  client_ip: string
+  client_port: number
+  server_ip: string
+  server_port: number
+  start_ts?: string
+  end_ts?: string
   syn_time?: string
   syn_ack_time?: string
   ack_time?: string
-  rtt_ms?: number
+  handshake_rtt_ms_estimate?: number
   bytes_sent: number
   bytes_recv: number
+  bytes_client_to_server: number
+  bytes_server_to_client: number
+  packet_count: number
   throughput_bps?: number
-  retransmits: number
+  tcp_retransmissions: number
+  tcp_syn_retransmissions: number
   out_of_order: number
+  dup_acks: number
+  first_payload_ts?: string
+  last_payload_ts?: string
+  duration_ms?: number
+  app_bytes: number
+  tcp_stream?: number
   rst_count?: number
   fragment_count?: number
   tls_sni?: string
@@ -37,6 +51,7 @@ export type Flow = {
   tls_client_hello?: boolean
   tls_server_hello?: boolean
   tls_alert?: boolean
+  tls_alert_code?: number
   mss?: number
   http_method?: string
   http_host?: string
@@ -45,11 +60,11 @@ export type Flow = {
 
 export type Issue = {
   id: number
-  severity: 'HIGH' | 'MED' | 'LOW'
-  type: string
+  job_id?: number
+  issue_type: string
+  severity: number
   title: string
-  description: string
-  evidence_json: string
+  summary: string
+  primary_flow_id?: number
   created_at: string
-  flow_id?: number
 }

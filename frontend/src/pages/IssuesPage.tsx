@@ -5,76 +5,40 @@ import { useSearchParams } from 'react-router-dom'
 import { Page } from '../components/Page'
 import { SectionHeader } from '../components/SectionHeader'
 import { StackCard } from '../components/StackCard'
+import { IssueCard } from '../components/IssueCard'
 import { AnimatedDialog } from '../components/AnimatedDialog'
 import { Button } from '../components/ui/button'
 import { Select } from '../components/ui/select'
 import { Badge } from '../components/ui/badge'
 import { Skeleton } from '../components/ui/skeleton'
+import { severityLabel, severityVariant } from '../components/IssueSeverity'
 
-type InlineToken = { type: 'text' | 'bold' | 'italic' | 'code'; value: string }
-
-function tokenizeInline(text: string): InlineToken[] {
-  const regex = /(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)/g
-  const parts = text.split(regex).filter((part) => part !== '')
-  return parts.map((part) => {
-    if (part.startsWith('**') && part.endsWith('**')) {
-      return { type: 'bold', value: part.slice(2, -2) }
-    }
-    if (part.startsWith('*') && part.endsWith('*')) {
-      return { type: 'italic', value: part.slice(1, -1) }
-    }
-    if (part.startsWith('`') && part.endsWith('`')) {
-      return { type: 'code', value: part.slice(1, -1) }
-    }
-    return { type: 'text', value: part }
-  })
-}
-
-function renderDecoratedText(text: string) {
-  const lines = text.split('\n')
-  const headingRegex = /^(summary|likely causes|next steps|confidence|diagnosis|observations|recommendations)\b[:\-]?/i
-
+function renderExplanation(exp: any) {
+  if (!exp) {
+    return <div className="text-sm text-muted-foreground">No explanation yet.</div>
+  }
   return (
-    <div className="space-y-2">
-      {lines.map((line, idx) => {
-        const trimmed = line.trim()
-        if (!trimmed) {
-          return <div key={idx} className="h-2" />
-        }
-        const isHeading = headingRegex.test(trimmed)
-        const tokens = tokenizeInline(trimmed)
-        return (
-          <div
-            key={idx}
-            className={isHeading ? 'text-xs uppercase tracking-wide text-primary font-semibold' : 'text-sm text-foreground/90'}
-          >
-            {tokens.map((token, tIdx) => {
-              if (token.type === 'bold') {
-                return (
-                  <strong key={tIdx} className="font-semibold text-foreground">
-                    {token.value}
-                  </strong>
-                )
-              }
-              if (token.type === 'italic') {
-                return (
-                  <em key={tIdx} className="italic text-foreground/90">
-                    {token.value}
-                  </em>
-                )
-              }
-              if (token.type === 'code') {
-                return (
-                  <code key={tIdx} className="px-1 py-0.5 rounded-sm border border-border bg-secondary/40 font-mono text-xs">
-                    {token.value}
-                  </code>
-                )
-              }
-              return <span key={tIdx}>{token.value}</span>
-            })}
-          </div>
-        )
-      })}
+    <div className="space-y-3 text-sm">
+      <div>
+        <div className="text-xs uppercase text-muted-foreground">Explanation</div>
+        <div className="mt-1 text-foreground/90">{exp.explanation || 'n/a'}</div>
+      </div>
+      <div>
+        <div className="text-xs uppercase text-muted-foreground">Possible Causes</div>
+        <ul className="list-disc list-inside text-foreground/90">
+          {(exp.possible_causes || []).map((item: string, idx: number) => (
+            <li key={idx}>{item}</li>
+          ))}
+        </ul>
+      </div>
+      <div>
+        <div className="text-xs uppercase text-muted-foreground">Next Steps</div>
+        <ul className="list-disc list-inside text-foreground/90">
+          {(exp.next_steps || []).map((item: string, idx: number) => (
+            <li key={idx}>{item}</li>
+          ))}
+        </ul>
+      </div>
     </div>
   )
 }
@@ -114,7 +78,11 @@ export default function IssuesPage() {
 
   const filtered = useMemo(() => {
     if (!issues) return []
-    return issues.filter((issue: any) => (severity ? issue.severity === severity : true))
+    return issues.filter((issue: any) => {
+      if (!severity) return true
+      const label = severityLabel(issue.severity)
+      return label === severity
+    })
   }, [issues, severity])
 
   const explain = async () => {
@@ -176,26 +144,18 @@ export default function IssuesPage() {
             <div className="text-sm font-semibold mb-2">Issue List</div>
             <div className="space-y-2 max-h-[420px] overflow-auto scroll-sharp">
               {filtered.map((issue: any) => (
-                <StackCard
+                <IssueCard
                   key={issue.id}
-                  className="cursor-pointer hover:border-primary/60"
-                  onClick={() => {
-                    setSelectedIssue(issue)
+                  issue={issue}
+                  selected={selectedIssue?.id === issue.id}
+                  showSummary={false}
+                  showEndpoint={false}
+                  showStream={false}
+                  onSelect={(selected) => {
+                    setSelectedIssue(selected)
                     setExplanation(null)
                   }}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="text-sm font-medium">{issue.title}</div>
-                    <Badge
-                      variant={
-                        issue.severity === 'HIGH' ? 'high' : issue.severity === 'MED' ? 'med' : 'low'
-                      }
-                    >
-                      {issue.severity}
-                    </Badge>
-                  </div>
-                  <div className="text-xs text-muted-foreground">{issue.type}</div>
-                </StackCard>
+                />
               ))}
               {!filtered.length && (
                 <div className="text-xs text-muted-foreground">Select a PCAP to view issues.</div>
@@ -208,7 +168,7 @@ export default function IssuesPage() {
             {selectedIssue ? (
               <div className="space-y-2 text-sm">
                 <div className="font-semibold">{selectedIssue.title}</div>
-                <div className="text-muted-foreground">{selectedIssue.description}</div>
+                <div className="text-muted-foreground">{selectedIssue.summary}</div>
                 <Button size="sm" onClick={explain}>
                   Explain with AI
                 </Button>
@@ -223,7 +183,7 @@ export default function IssuesPage() {
       <AnimatedDialog
         open={explainOpen}
         onClose={() => setExplainOpen(false)}
-        title="AI Explanation"
+        title="AI Explanation (Derived from computed metrics)"
         bodyClassName="overflow-hidden"
         panelClassName="max-w-6xl w-[95vw]"
       >
@@ -236,7 +196,7 @@ export default function IssuesPage() {
                 <span className="text-sm text-muted-foreground">Generating explanation...</span>
               </div>
             ) : explanation ? (
-              renderDecoratedText(explanation.response || '')
+              renderExplanation(explanation.response)
             ) : (
               <div className="text-sm text-muted-foreground">No explanation yet.</div>
             )}

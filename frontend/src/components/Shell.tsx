@@ -1,4 +1,4 @@
-import { Menu, Moon, SunMedium, Upload, Bug, Network } from 'lucide-react'
+import { ArrowLeft, Menu, Moon, SunMedium, Upload, Bug } from 'lucide-react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useThemeMode } from '../lib/theme-state'
 import { cn } from '../lib/utils'
@@ -10,8 +10,7 @@ type NavItem = { label: string; to: string; icon: ReactNode }
 
 const navItems: NavItem[] = [
   { label: 'Captures', to: '/pcaps', icon: <Upload size={16} /> },
-  { label: 'Issues', to: '/issues', icon: <Bug size={16} /> },
-  { label: 'Flows', to: '/pcaps', icon: <Network size={16} /> }
+  { label: 'Issues', to: '/issues', icon: <Bug size={16} /> }
 ]
 
 export function Shell({ children }: { children: ReactNode }) {
@@ -70,6 +69,9 @@ export function Shell({ children }: { children: ReactNode }) {
         <header className="h-14 border-b border-border flex items-center px-3 md:px-6 gap-3">
           <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setOpen((o) => !o)}>
             <Menu size={16} />
+          </Button>
+          <Button variant="ghost" size="icon" onClick={() => navigate(-1)} aria-label="Go back">
+            <ArrowLeft size={16} />
           </Button>
           <div className="flex items-center gap-2 text-sm">
             <span className="text-muted-foreground">NetSage</span>

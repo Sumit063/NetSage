@@ -22,6 +22,11 @@ export default function FlowDetailPage() {
   const [certOpen, setCertOpen] = useState(false)
 
   const { data: flow } = useQuery({ queryKey: ['flow', id], queryFn: () => api.getFlow(id!) })
+  const { data: jobs } = useQuery({
+    queryKey: ['jobs', flow?.pcap_id],
+    queryFn: () => api.listJobs(String(flow?.pcap_id)),
+    enabled: !!flow?.pcap_id
+  })
   const { data: issues } = useQuery({
     queryKey: ['flowIssues', flow?.pcap_id, id],
     queryFn: () => api.listIssuesForFlow(String(flow.pcap_id), id!),
@@ -36,12 +41,19 @@ export default function FlowDetailPage() {
   }
 
   const subtitle = flow
-    ? `${flow.src_ip}:${flow.src_port} → ${flow.dst_ip}:${flow.dst_port} (${flow.proto})`
+    ? `${flow.client_ip}:${flow.client_port} → ${flow.server_ip}:${flow.server_port} (${flow.protocol})`
     : 'Loading flow details...'
 
   const mss = typeof flow?.mss === 'number' ? flow.mss : null
   const mtuV4 = mss ? mss + 40 : null
   const mtuV6 = mss ? mss + 60 : null
+  const latestJob = jobs && jobs.length > 0 ? jobs[0] : null
+  const severityLabel = (value?: number) => {
+    if (!value) return 'n/a'
+    if (value >= 4) return 'HIGH'
+    if (value >= 2) return 'MED'
+    return 'LOW'
+  }
 
   return (
     <Page>
@@ -70,12 +82,12 @@ export default function FlowDetailPage() {
           <Panel className="p-4">
             <div className="text-xs uppercase text-muted-foreground">RTT</div>
             <div className="text-xl font-semibold">
-              {flow ? (typeof flow?.rtt_ms === 'number' ? `${flow.rtt_ms.toFixed(1)} ms` : 'n/a') : <Skeleton className="h-5 w-16" />}
+              {flow ? (typeof flow?.handshake_rtt_ms_estimate === 'number' ? `${flow.handshake_rtt_ms_estimate.toFixed(1)} ms` : 'n/a') : <Skeleton className="h-5 w-16" />}
             </div>
           </Panel>
           <Panel className="p-4">
             <div className="text-xs uppercase text-muted-foreground">Retransmits</div>
-            <div className="text-xl font-semibold">{flow?.retransmits ?? <Skeleton className="h-5 w-10" />}</div>
+            <div className="text-xl font-semibold">{flow?.tcp_retransmissions ?? <Skeleton className="h-5 w-10" />}</div>
           </Panel>
           <Panel className="p-4">
             <div className="text-xs uppercase text-muted-foreground">Out-of-Order</div>
@@ -86,19 +98,19 @@ export default function FlowDetailPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <Panel className="p-4">
             <div className="text-sm font-semibold">TCP/UDP Handshake</div>
-            {flow?.proto === 'TCP' ? (
+            {flow?.protocol === 'TCP' ? (
               <div className="space-y-1 mt-2 text-sm">
                 <div>SYN: {formatTime(flow?.syn_time)}</div>
                 <div>SYN/ACK: {formatTime(flow?.syn_ack_time)}</div>
                 <div>ACK: {formatTime(flow?.ack_time)}</div>
-                <div>Handshake RTT: {typeof flow?.rtt_ms === 'number' ? `${flow.rtt_ms.toFixed(1)} ms` : 'n/a'}</div>
+                <div>Handshake RTT: {typeof flow?.handshake_rtt_ms_estimate === 'number' ? `${flow.handshake_rtt_ms_estimate.toFixed(1)} ms` : 'n/a'}</div>
                 <div>RSTs: {flow?.rst_count ?? 0}</div>
               </div>
             ) : (
               <div className="space-y-1 mt-2 text-sm text-muted-foreground">
                 <div>UDP is connectionless (no handshake).</div>
-                <div>First seen: {formatTime(flow?.first_seen)}</div>
-                <div>Last seen: {formatTime(flow?.last_seen)}</div>
+                <div>First seen: {formatTime(flow?.start_ts)}</div>
+                <div>Last seen: {formatTime(flow?.end_ts)}</div>
               </div>
             )}
           </Panel>
@@ -112,7 +124,7 @@ export default function FlowDetailPage() {
               <div className="text-muted-foreground">ServerHello</div>
               <div className="font-mono">{flow?.tls_server_hello ? 'yes' : 'no'}</div>
               <div className="text-muted-foreground">TLS Alert</div>
-              <div className="font-mono">{flow?.tls_alert ? 'yes' : 'no'}</div>
+              <div className="font-mono">{flow?.tls_alert ? `yes${flow.tls_alert_code ? ` (${flow.tls_alert_code})` : ''}` : 'no'}</div>
               <div className="text-muted-foreground">SNI</div>
               <div className="font-mono">{flow?.tls_sni ?? 'n/a'}</div>
               <div className="text-muted-foreground">ALPN</div>
@@ -128,20 +140,24 @@ export default function FlowDetailPage() {
         <Panel className="p-4">
           <div className="text-sm font-semibold">Metrics, MSS/MTU, Flags</div>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm mt-2">
-            <div className="text-muted-foreground">Bytes Sent</div>
-            <div className="font-mono">{flow?.bytes_sent ?? '—'}</div>
-            <div className="text-muted-foreground">Bytes Recv</div>
-            <div className="font-mono">{flow?.bytes_recv ?? '—'}</div>
+            <div className="text-muted-foreground">TCP Stream</div>
+            <div className="font-mono">{typeof flow?.tcp_stream === 'number' ? flow.tcp_stream : 'n/a'}</div>
+            <div className="text-muted-foreground">Bytes C→S</div>
+            <div className="font-mono">{flow?.bytes_client_to_server ?? '—'}</div>
+            <div className="text-muted-foreground">Bytes S→C</div>
+            <div className="font-mono">{flow?.bytes_server_to_client ?? '—'}</div>
             <div className="text-muted-foreground">Throughput</div>
             <div className="font-mono">{typeof flow?.throughput_bps === 'number' ? `${Math.round(flow.throughput_bps)} B/s` : 'n/a'}</div>
             <div className="text-muted-foreground">MSS</div>
             <div className="font-mono">{mss ?? 'n/a'}</div>
             <div className="text-muted-foreground">Est. MTU (v4/v6)</div>
             <div className="font-mono">{mss ? `${mtuV4} / ${mtuV6}` : 'n/a'}</div>
-            <div className="text-muted-foreground">Retransmits</div>
-            <div className="font-mono">{flow?.retransmits ?? 0}</div>
+            <div className="text-muted-foreground">TCP Retransmits</div>
+            <div className="font-mono">{flow?.tcp_retransmissions ?? 0}</div>
             <div className="text-muted-foreground">Out-of-Order</div>
             <div className="font-mono">{flow?.out_of_order ?? 0}</div>
+            <div className="text-muted-foreground">Dup ACKs</div>
+            <div className="font-mono">{flow?.dup_acks ?? 0}</div>
             <div className="text-muted-foreground">RSTs</div>
             <div className="font-mono">{flow?.rst_count ?? 0}</div>
             <div className="text-muted-foreground">Fragments</div>
@@ -152,9 +168,11 @@ export default function FlowDetailPage() {
         <Panel className="p-4">
           <div className="flex items-center justify-between mb-2">
             <div className="text-sm font-semibold">Issues</div>
-            <Button variant="outline" size="sm" asChild>
-              <Link to={`/issues?pcap=${flow?.pcap_id}`}>Open Issues</Link>
-            </Button>
+            {latestJob ? (
+              <Button variant="outline" size="sm" asChild>
+                <Link to={`/jobs/${latestJob.id}/triage`}>Open Triage</Link>
+              </Button>
+            ) : null}
           </div>
           <div className="space-y-2">
             {issues?.length ? (
@@ -166,11 +184,13 @@ export default function FlowDetailPage() {
                   <div>
                     <div className="text-sm font-medium">{issue.title}</div>
                     <div className="text-xs text-muted-foreground">
-                      {issue.severity} · {issue.type}
+                      {severityLabel(issue.severity)} · {issue.issue_type}
                     </div>
                   </div>
                   <Button variant="ghost" size="sm" asChild>
-                    <Link to={`/issues?pcap=${flow?.pcap_id}&issue=${issue.id}`}>Explain</Link>
+                    <Link to={latestJob ? `/jobs/${latestJob.id}/triage?issue=${issue.id}` : '#'}>
+                      Explain
+                    </Link>
                   </Button>
                 </div>
               ))
