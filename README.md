@@ -45,6 +45,13 @@ docker-compose up --build
 - Triage UI: issue list → issue detail → related flows and metrics snapshot.
 - Optional AI explanations derived strictly from computed metrics.
 
+## Viewer mode
+NetSage now ships a lightweight **Job Viewer** page inspired by Wireshark:
+- One dashboard with **Overview**, **Packets**, and **Triage** tabs.
+- Global filter bar for IP/port/protocol/SNI (applies to overview tables and packet list).
+- Top talkers, top destinations, conversations, and protocol/port breakdowns.
+- Packet list with a details side panel (no payloads stored).
+
 ## Deployment (Vercel + Render)
 See `docs/DEPLOYMENT.md` for the full CI/CD flow.
 

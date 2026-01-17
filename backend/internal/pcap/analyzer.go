@@ -147,6 +147,11 @@ func parsePacket(packet gopacket.Packet) (flows.PacketInfo, bool) {
 
 	ts := packet.Metadata().Timestamp
 	info.Timestamp = ts
+	if packet.Metadata() != nil {
+		info.Length = packet.Metadata().CaptureLength
+	} else {
+		info.Length = len(packet.Data())
+	}
 
 	var srcIP, dstIP string
 	isFragment := false
@@ -178,7 +183,15 @@ func parsePacket(packet gopacket.Packet) (flows.PacketInfo, bool) {
 		info.PayloadLen = len(tcp.Payload)
 		info.Seq = tcp.Seq
 		info.Ack = tcp.Ack
-		info.TCPFlags = flows.TCPFlags{SYN: tcp.SYN, ACK: tcp.ACK, FIN: tcp.FIN, RST: tcp.RST}
+		info.Window = tcp.Window
+		info.TCPFlags = flows.TCPFlags{
+			SYN: tcp.SYN,
+			ACK: tcp.ACK,
+			FIN: tcp.FIN,
+			RST: tcp.RST,
+			PSH: tcp.PSH,
+			URG: tcp.URG,
+		}
 
 		if tcp.SYN {
 			for _, opt := range tcp.Options {

@@ -78,10 +78,13 @@ export const api = {
   getJob(id: string) {
     return apiFetch<any>(`/api/jobs/${id}`)
   },
+  getJobSummary(id: string) {
+    return apiFetch<any>(`/api/jobs/${id}/summary`)
+  },
   listFlows(pcapId: string) {
     return apiFetch<any[]>(`/api/pcaps/${pcapId}/flows`)
   },
-  listJobFlows(jobId: string, params?: Record<string, string | number | undefined>) {
+  listJobFlows(jobId: string, params?: Record<string, string | number | undefined>, options?: { signal?: AbortSignal }) {
     const search = new URLSearchParams()
     if (params) {
       Object.entries(params).forEach(([key, value]) => {
@@ -90,10 +93,32 @@ export const api = {
       })
     }
     const qs = search.toString()
-    return apiFetch<any[]>(`/api/jobs/${jobId}/flows${qs ? `?${qs}` : ''}`)
+    return apiFetch<any[]>(`/api/jobs/${jobId}/flows${qs ? `?${qs}` : ''}`, { signal: options?.signal })
+  },
+  listJobPackets(jobId: string, params?: Record<string, string | number | undefined>, options?: { signal?: AbortSignal }) {
+    const search = new URLSearchParams()
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value === undefined || value === null || value === '') return
+        search.set(key, String(value))
+      })
+    }
+    const qs = search.toString()
+    return apiFetch<any>(`/api/jobs/${jobId}/packets${qs ? `?${qs}` : ''}`, { signal: options?.signal })
   },
   getFlow(flowId: string) {
     return apiFetch<any>(`/api/flows/${flowId}`)
+  },
+  getFlowTimeseries(flowId: string, params?: Record<string, string | number | undefined>, options?: { signal?: AbortSignal }) {
+    const search = new URLSearchParams()
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value === undefined || value === null || value === '') return
+        search.set(key, String(value))
+      })
+    }
+    const qs = search.toString()
+    return apiFetch<any>(`/api/flows/${flowId}/timeseries${qs ? `?${qs}` : ''}`, { signal: options?.signal })
   },
   listIssues(pcapId: string) {
     return apiFetch<any[]>(`/api/pcaps/${pcapId}/issues`)

@@ -29,9 +29,11 @@ type PacketInfo struct {
 	DstIP          string
 	SrcPort        int
 	DstPort        int
+	Length         int
 	PayloadLen     int
 	Seq            uint32
 	Ack            uint32
+	Window         uint16
 	TCPFlags       TCPFlags
 	MSS            *int
 	IsFragment     bool
@@ -51,6 +53,8 @@ type TCPFlags struct {
 	ACK bool
 	FIN bool
 	RST bool
+	PSH bool
+	URG bool
 }
 
 type SeqState struct {

@@ -8,54 +8,51 @@ import { Panel } from '../components/Panel'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { Badge } from '../components/ui/badge'
-import { Table, Tbody, Td, Th, Thead, Tr } from '../components/ui/table'
+import { DataTable } from '../components/DataTable'
 import { Skeleton } from '../components/ui/skeleton'
 import { ExternalLink, Trash2 } from 'lucide-react'
 import { ConfirmDialog } from '../components/ui/confirm-dialog'
 
-function PcapCard({ pcap, onDelete }: { pcap: any; onDelete: (pcap: any) => void }) {
-  const { data: jobs } = useQuery({ queryKey: ['jobs', pcap.id], queryFn: () => api.listJobs(String(pcap.id)) })
-  const latest = jobs && jobs.length > 0 ? jobs[0] : null
-  const progress = latest?.progress ?? 0
+function useLatestJob(pcapId: string) {
+  const { data: jobs } = useQuery({ queryKey: ['jobs', pcapId], queryFn: () => api.listJobs(String(pcapId)), enabled: !!pcapId })
+  return jobs && jobs.length > 0 ? jobs[0] : null
+}
 
+function PcapStatusCell({ pcapId }: { pcapId: string }) {
+  const latest = useLatestJob(pcapId)
+  const progress = latest?.progress ?? 0
+  return latest ? (
+    <div className="flex items-center gap-3 text-muted-foreground">
+      <div className="text-xs font-mono uppercase tracking-wide">{latest.status}</div>
+      <div className="h-2 w-32 rounded-sm bg-muted/70 overflow-hidden border border-border">
+        <div className="h-full bg-primary" style={{ width: `${progress}%` }} />
+      </div>
+      <div className="text-xs font-mono text-muted-foreground w-10 text-right">{Math.round(progress)}%</div>
+    </div>
+  ) : (
+    <span className="text-xs text-muted-foreground">Pending analysis</span>
+  )
+}
+
+function PcapActionsCell({ pcap, onDelete }: { pcap: any; onDelete: (pcap: any) => void }) {
+  const latest = useLatestJob(String(pcap.id))
   return (
-    <Tr>
-      <Td className="font-medium max-w-[320px] truncate" title={pcap.filename}>
-        {pcap.filename}
-      </Td>
-      <Td className="text-muted-foreground">{new Date(pcap.uploaded_at).toLocaleString()}</Td>
-      <Td className="text-muted-foreground">
-        {latest ? (
-          <div className="flex items-center gap-3">
-            <div className="text-xs font-mono uppercase tracking-wide">{latest.status}</div>
-            <div className="h-2 w-32 rounded-sm bg-muted/70 overflow-hidden border border-border">
-              <div className="h-full bg-primary" style={{ width: `${progress}%` }} />
-            </div>
-            <div className="text-xs font-mono text-muted-foreground w-10 text-right">{Math.round(progress)}%</div>
-          </div>
-        ) : (
-          <span className="text-xs text-muted-foreground">Pending analysis</span>
-        )}
-      </Td>
-      <Td className="text-right whitespace-nowrap w-[140px]">
-        <div className="flex items-center justify-end gap-2">
-          <Button variant="ghost" size="icon" asChild>
-            <Link to={`/pcaps/${pcap.id}`} aria-label="Open capture" title="Open">
-              <ExternalLink size={16} />
-            </Link>
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => onDelete(pcap)}
-            aria-label="Delete capture"
-            title="Delete"
-          >
-            <Trash2 size={16} />
-          </Button>
-        </div>
-      </Td>
-    </Tr>
+    <div className="flex items-center justify-end gap-2">
+      {latest ? (
+        <Button variant="ghost" size="icon" asChild>
+          <Link to={`/pcaps/${pcap.id}`} aria-label="Open capture details" title="Open">
+            <ExternalLink size={16} />
+          </Link>
+        </Button>
+      ) : (
+        <Button variant="ghost" size="icon" disabled aria-label="Open capture" title="Awaiting job">
+          <ExternalLink size={16} />
+        </Button>
+      )}
+      <Button variant="ghost" size="icon" onClick={() => onDelete(pcap)} aria-label="Delete capture" title="Delete">
+        <Trash2 size={16} />
+      </Button>
+    </div>
   )
 }
 
@@ -99,7 +96,7 @@ export default function PcapsPage() {
     }
   }
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+  const { getRootProps, getInputProps } = useDropzone({
     onDrop: (accepted) => setFile(accepted[0] || null),
     multiple: false
   })
@@ -166,28 +163,42 @@ export default function PcapsPage() {
               <Skeleton className="h-10 w-full" />
             </div>
           ) : (
-            <Table className="min-w-[700px]">
-              <Thead>
-                <Tr>
-                  <Th>Filename</Th>
-                  <Th>Uploaded</Th>
-                  <Th>Status</Th>
-                  <Th className="text-right whitespace-nowrap w-[160px] pr-6">Actions</Th>
-                </Tr>
-              </Thead>
-              <Tbody>
-                {filtered.map((pcap: any) => (
-                  <PcapCard key={pcap.id} pcap={pcap} onDelete={handleDelete} />
-                ))}
-                {!filtered.length && (
-                  <Tr>
-                    <Td colSpan={4} className="text-center text-muted-foreground">
-                      No captures yet.
-                    </Td>
-                  </Tr>
-                )}
-              </Tbody>
-            </Table>
+            <DataTable
+              data={filtered}
+              emptyLabel="No captures yet."
+              tableClassName="min-w-[700px]"
+              columns={[
+                {
+                  key: 'filename',
+                  header: 'Filename',
+                  cellClassName: 'font-medium max-w-[320px] truncate',
+                  cell: (pcap) => (
+                    <span className="block truncate" title={pcap.filename}>
+                      {pcap.filename}
+                    </span>
+                  )
+                },
+                {
+                  key: 'uploaded',
+                  header: 'Uploaded',
+                  cellClassName: 'text-muted-foreground',
+                  cell: (pcap) => new Date(pcap.uploaded_at).toLocaleString()
+                },
+                {
+                  key: 'status',
+                  header: 'Status',
+                  cellClassName: 'text-muted-foreground',
+                  cell: (pcap) => <PcapStatusCell pcapId={String(pcap.id)} />
+                },
+                {
+                  key: 'actions',
+                  header: 'Actions',
+                  headerClassName: 'text-right whitespace-nowrap w-[160px] pr-6',
+                  cellClassName: 'text-right whitespace-nowrap w-[160px]',
+                  cell: (pcap) => <PcapActionsCell pcap={pcap} onDelete={handleDelete} />
+                }
+              ]}
+            />
           )}
         </Panel>
       </div>

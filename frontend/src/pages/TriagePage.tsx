@@ -13,8 +13,40 @@ import { Badge } from '../components/ui/badge'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { Select } from '../components/ui/select'
-import { Table, Tbody, Td, Th, Thead, Tr } from '../components/ui/table'
 import { Skeleton } from '../components/ui/skeleton'
+import { DetailGrid, DetailItem } from '../components/DetailFields'
+import { DataTable, DataTableColumn } from '../components/DataTable'
+import { AnimatedDialog } from '../components/AnimatedDialog'
+
+function renderExplanation(exp: any) {
+  if (!exp) {
+    return <div className="text-sm text-muted-foreground">No explanation yet.</div>
+  }
+  return (
+    <div className="space-y-3 text-sm">
+      <div>
+        <div className="text-xs uppercase text-muted-foreground">Explanation</div>
+        <div className="mt-1 text-foreground/90">{exp.explanation || 'n/a'}</div>
+      </div>
+      <div>
+        <div className="text-xs uppercase text-muted-foreground">Possible Causes</div>
+        <ul className="list-disc list-inside text-foreground/90">
+          {(exp.possible_causes || []).map((item: string, idx: number) => (
+            <li key={idx}>{item}</li>
+          ))}
+        </ul>
+      </div>
+      <div>
+        <div className="text-xs uppercase text-muted-foreground">Next Steps</div>
+        <ul className="list-disc list-inside text-foreground/90">
+          {(exp.next_steps || []).map((item: string, idx: number) => (
+            <li key={idx}>{item}</li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  )
+}
 
 export default function TriagePage() {
   const { id } = useParams()
@@ -24,6 +56,7 @@ export default function TriagePage() {
   const [selectedIssueId, setSelectedIssueId] = useState<string | null>(initialIssue)
   const [explanation, setExplanation] = useState<any | null>(null)
   const [explainLoading, setExplainLoading] = useState(false)
+  const [explainOpen, setExplainOpen] = useState(false)
 
   const [issueTypeFilter, setIssueTypeFilter] = useState('')
   const [severityFilter, setSeverityFilter] = useState('')
@@ -142,15 +175,21 @@ export default function TriagePage() {
   const selectedIssue = issues?.find((issue: any) => String(issue.id) === String(selectedIssueId))
   const evidence = issueDetail?.evidence || []
   const metrics = evidence.length > 0 ? evidence[0].metrics || {} : {}
+  const metricItems = Object.entries(metrics).map(([key, value]) => ({
+    label: key,
+    value: String(value)
+  })) as DetailItem[]
 
   const explain = async () => {
     if (!selectedIssueId) return
     setExplainLoading(true)
+    setExplainOpen(true)
+    setExplanation(null)
     try {
       const data = await api.explainIssue(String(selectedIssueId))
       setExplanation(data)
     } catch (err) {
-      setExplanation(null)
+      setExplanation({ response: { explanation: 'Failed to generate explanation.', possible_causes: [], next_steps: [] }, shared: {} })
     } finally {
       setExplainLoading(false)
     }
@@ -262,52 +301,20 @@ export default function TriagePage() {
                 <div>
                   <div className="text-xs uppercase text-muted-foreground mb-2">Metrics Snapshot</div>
                   {Object.keys(metrics).length ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
-                      {Object.entries(metrics).map(([key, value]) => (
-                        <div key={key} className="flex items-center justify-between border border-border rounded-sm px-2 py-1">
-                          <span className="text-muted-foreground">{key}</span>
-                          <span className="font-mono">{String(value)}</span>
-                        </div>
-                      ))}
-                    </div>
+                    <DetailGrid items={metricItems} className="text-xs" />
                   ) : (
                     <div className="text-xs text-muted-foreground">No metrics captured.</div>
                   )}
                 </div>
 
-                <div className="border border-border rounded-md p-3">
-                  <div className="flex items-center justify-between mb-2">
+                <div className="border border-border rounded-md p-3 flex items-center justify-between gap-3">
+                  <div>
                     <div className="text-xs uppercase text-muted-foreground">AI Explanation (Derived from computed metrics)</div>
-                    <Button size="sm" onClick={explain} disabled={explainLoading}>
-                      {explainLoading ? 'Generating...' : 'Explain'}
-                    </Button>
+                    <div className="text-xs text-muted-foreground mt-1">Opens a modal with the explanation and shared data.</div>
                   </div>
-                  {explanation?.response ? (
-                    <div className="space-y-3">
-                      <div>
-                        <div className="text-xs uppercase text-muted-foreground">Explanation</div>
-                        <div className="text-foreground/90 mt-1">{explanation.response.explanation}</div>
-                      </div>
-                      <div>
-                        <div className="text-xs uppercase text-muted-foreground">Possible Causes</div>
-                        <ul className="list-disc list-inside text-foreground/90">
-                          {(explanation.response.possible_causes || []).map((item: string, idx: number) => (
-                            <li key={idx}>{item}</li>
-                          ))}
-                        </ul>
-                      </div>
-                      <div>
-                        <div className="text-xs uppercase text-muted-foreground">Next Steps</div>
-                        <ul className="list-disc list-inside text-foreground/90">
-                          {(explanation.response.next_steps || []).map((item: string, idx: number) => (
-                            <li key={idx}>{item}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="text-xs text-muted-foreground">No explanation available.</div>
-                  )}
+                  <Button size="sm" onClick={explain} disabled={explainLoading}>
+                    {explainLoading ? 'Generating...' : 'Explain'}
+                  </Button>
                 </div>
               </div>
             ) : (
@@ -346,70 +353,124 @@ export default function TriagePage() {
             </div>
           ) : (
             <div className="mt-3">
-              <Table className="min-w-[980px]">
-                <Thead>
-                  <Tr>
-                    <Th className="text-center w-16">Issue</Th>
-                    <Th>Endpoint</Th>
-                    <Th className="text-center">Protocol</Th>
-                    <Th className="text-center">TCP Stream</Th>
-                    <Th className="text-center">RTT (ms)</Th>
-                    <Th className="text-center">Retrans</Th>
-                    <Th className="text-center">Duration (ms)</Th>
-                    <Th className="text-right">Actions</Th>
-                  </Tr>
-                </Thead>
-                <Tbody>
-                  {filteredFlows.map((flow: any) => {
-                    const flowSeverity = issueSeverityByFlow.get(flow.id)
-                    return (
-                      <Tr key={flow.id}>
-                        <Td>
-                          <div className="flex items-center justify-center">
-                            <SeverityIcon value={flowSeverity} />
-                          </div>
-                        </Td>
-                        <Td className="font-mono text-xs text-muted-foreground">
+              <DataTable
+                data={filteredFlows}
+                emptyLabel="No matching flows."
+                tableClassName="min-w-[980px]"
+                columns={
+                  [
+                    {
+                      key: 'issue',
+                      header: 'Issue',
+                      headerClassName: 'text-center w-16',
+                      cellClassName: 'text-center',
+                      cell: (flow) => <SeverityIcon value={issueSeverityByFlow.get(flow.id)} />
+                    },
+                    {
+                      key: 'endpoint',
+                      header: 'Endpoint',
+                      cellClassName: 'font-mono text-xs text-muted-foreground',
+                      cell: (flow) => (
+                        <>
                           {flow.client_ip}:{flow.client_port} → {flow.server_ip}:{flow.server_port}
-                        </Td>
-                        <Td className="text-center">{flow.protocol}</Td>
-                        <Td className="text-center">
-                          {typeof flow.tcp_stream === 'number' ? (
-                            <button
-                              type="button"
-                              className="text-primary text-xs"
-                              onClick={() => handleStreamClick(flow.tcp_stream)}
-                            >
-                              {flow.tcp_stream}
-                            </button>
-                          ) : '—'}
-                        </Td>
-                        <Td className="text-center">
-                          {typeof flow.handshake_rtt_ms_estimate === 'number' ? flow.handshake_rtt_ms_estimate.toFixed(1) : 'n/a'}
-                        </Td>
-                        <Td className="text-center">{flow.tcp_retransmissions}</Td>
-                        <Td className="text-center">{typeof flow.duration_ms === 'number' ? Math.round(flow.duration_ms) : 'n/a'}</Td>
-                        <Td className="text-right">
-                          <Button variant="ghost" size="sm" asChild>
-                            <Link to={`/flows/${flow.id}`}>Inspect</Link>
-                          </Button>
-                        </Td>
-                      </Tr>
-                    )
-                  })}
-                  {!filteredFlows.length && (
-                    <Tr>
-                      <Td colSpan={8} className="text-center text-muted-foreground">
-                        No matching flows.
-                      </Td>
-                    </Tr>
-                  )}
-                </Tbody>
-              </Table>
+                        </>
+                      )
+                    },
+                    {
+                      key: 'protocol',
+                      header: 'Protocol',
+                      headerClassName: 'text-center',
+                      cellClassName: 'text-center',
+                      cell: (flow) => flow.protocol
+                    },
+                    {
+                      key: 'stream',
+                      header: 'TCP Stream',
+                      headerClassName: 'text-center',
+                      cellClassName: 'text-center',
+                      cell: (flow) =>
+                        typeof flow.tcp_stream === 'number' ? (
+                          <button type="button" className="text-primary text-xs" onClick={() => handleStreamClick(flow.tcp_stream)}>
+                            {flow.tcp_stream}
+                          </button>
+                        ) : (
+                          '—'
+                        )
+                    },
+                    {
+                      key: 'rtt',
+                      header: 'RTT (ms)',
+                      headerClassName: 'text-center',
+                      cellClassName: 'text-center',
+                      cell: (flow) =>
+                        typeof flow.handshake_rtt_ms_estimate === 'number' ? flow.handshake_rtt_ms_estimate.toFixed(1) : 'n/a'
+                    },
+                    {
+                      key: 'retrans',
+                      header: 'Retrans',
+                      headerClassName: 'text-center',
+                      cellClassName: 'text-center',
+                      cell: (flow) => flow.tcp_retransmissions
+                    },
+                    {
+                      key: 'duration',
+                      header: 'Duration (ms)',
+                      headerClassName: 'text-center',
+                      cellClassName: 'text-center',
+                      cell: (flow) => (typeof flow.duration_ms === 'number' ? Math.round(flow.duration_ms) : 'n/a')
+                    },
+                    {
+                      key: 'actions',
+                      header: 'Actions',
+                      headerClassName: 'text-right',
+                      cellClassName: 'text-right',
+                      cell: (flow) => (
+                        <Button variant="ghost" size="sm" asChild>
+                          <Link to={`/flows/${flow.id}`}>Inspect</Link>
+                        </Button>
+                      )
+                    }
+                  ] as DataTableColumn<any>[]
+                }
+              />
             </div>
           )}
         </StackCard>
       </div>
+
+      <AnimatedDialog
+        open={explainOpen}
+        onClose={() => setExplainOpen(false)}
+        title="AI Explanation (Derived from computed metrics)"
+        bodyClassName="overflow-hidden"
+        panelClassName="max-w-6xl w-[95vw]"
+      >
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,65%)_minmax(0,35%)] gap-4 h-[70vh]">
+          <div className="border border-border rounded-md p-3 overflow-auto">
+            <div className="text-xs uppercase text-muted-foreground mb-2">AI Explanation</div>
+            {explainLoading ? (
+              <div className="flex items-center gap-2">
+                <Skeleton className="h-4 w-24" />
+                <span className="text-sm text-muted-foreground">Generating explanation...</span>
+              </div>
+            ) : explanation ? (
+              renderExplanation(explanation.response)
+            ) : (
+              <div className="text-sm text-muted-foreground">No explanation yet.</div>
+            )}
+          </div>
+          <div className="border border-border rounded-md p-3 overflow-auto">
+            <div className="text-xs uppercase text-muted-foreground mb-2">Data Shared to AI</div>
+            {explainLoading ? (
+              <div className="text-sm text-muted-foreground">Waiting for response...</div>
+            ) : explanation ? (
+              <pre className="text-xs whitespace-pre-wrap">{JSON.stringify(explanation.shared, null, 2)}</pre>
+            ) : (
+              <div className="text-sm text-muted-foreground">No data shared.</div>
+            )}
+          </div>
+        </div>
+      </AnimatedDialog>
     </Page>
   )
 }

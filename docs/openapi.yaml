@@ -133,6 +133,20 @@ paths:
       responses:
         '200':
           description: Job detail
+  /api/jobs/{id}/summary:
+    get:
+      security:
+        - bearerAuth: []
+      summary: Get job summary
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Job summary
   /api/pcaps/{id}/flows:
     get:
       security:
@@ -201,6 +215,75 @@ paths:
       responses:
         '200':
           description: Flow list for job
+  /api/jobs/{id}/packets:
+    get:
+      security:
+        - bearerAuth: []
+      summary: List packets for job
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          schema:
+            type: integer
+        - name: offset
+          in: query
+          schema:
+            type: integer
+        - name: filter
+          in: query
+          schema:
+            type: string
+        - name: src_ip
+          in: query
+          schema:
+            type: string
+        - name: dst_ip
+          in: query
+          schema:
+            type: string
+        - name: src_port
+          in: query
+          schema:
+            type: integer
+        - name: dst_port
+          in: query
+          schema:
+            type: integer
+        - name: proto
+          in: query
+          schema:
+            type: string
+        - name: flags
+          in: query
+          schema:
+            type: string
+        - name: stream
+          in: query
+          schema:
+            type: integer
+        - name: pair
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Packet list for job
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  packets:
+                    type: array
+                    items:
+                      type: object
+                  total_count:
+                    type: integer
   /api/flows/{id}:
     get:
       security:
@@ -215,6 +298,24 @@ paths:
       responses:
         '200':
           description: Flow detail
+  /api/flows/{id}/timeseries:
+    get:
+      security:
+        - bearerAuth: []
+      summary: Get flow timeseries
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: granularity
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Flow timeseries
   /api/pcaps/{id}/issues:
     get:
       security:

@@ -68,3 +68,45 @@ export type Issue = {
   primary_flow_id?: number
   created_at: string
 }
+
+export type JobSummary = {
+  top_sources: { ip: string; packets: number; bytes: number }[]
+  top_destinations: { ip: string; packets: number; bytes: number }[]
+  top_conversations: {
+    client_ip: string
+    client_port: number
+    server_ip: string
+    server_port: number
+    packets: number
+    bytes: number
+    first_ts: string
+    last_ts: string
+    duration_ms: number
+  }[]
+  protocol_counts: Record<string, number>
+  top_ports: { port: number; packets: number }[]
+}
+
+export type PacketMeta = {
+  index: number
+  timestamp: string
+  protocol: string
+  src_ip: string
+  dst_ip: string
+  src_port: number
+  dst_port: number
+  length: number
+  info: string
+  error_tags?: string[]
+  tcp_flags: { SYN: boolean; ACK: boolean; FIN: boolean; RST: boolean }
+  seq: number
+  ack: number
+  window: number
+  tls_client_hello?: boolean
+  tls_server_hello?: boolean
+  tls_alert?: boolean
+  tls_alert_code?: number
+  tls_sni?: string
+  http_method?: string
+  http_host?: string
+}

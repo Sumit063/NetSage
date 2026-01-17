@@ -1,16 +1,16 @@
-import { ArrowLeft, Menu, Moon, SunMedium, Upload, Bug } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, LayoutDashboard, List, Menu, Moon, SunMedium, Upload } from 'lucide-react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { useThemeMode } from '../lib/theme-state'
 import { cn } from '../lib/utils'
 import { Button } from './ui/button'
 import { ReactNode, useState } from 'react'
 import { auth } from '../lib/auth'
+import { api } from '../lib/api'
 
-type NavItem = { label: string; to: string; icon: ReactNode }
-
+type NavItem = { label: string; to: string; icon: ReactNode; disabled?: boolean }
 const navItems: NavItem[] = [
-  { label: 'Captures', to: '/pcaps', icon: <Upload size={16} /> },
-  { label: 'Issues', to: '/issues', icon: <Bug size={16} /> }
+  { label: 'Captures', to: '/pcaps', icon: <Upload size={16} /> }
 ]
 
 export function Shell({ children }: { children: ReactNode }) {
@@ -18,6 +18,32 @@ export function Shell({ children }: { children: ReactNode }) {
   const navigate = useNavigate()
   const [theme, , toggleTheme] = useThemeMode()
   const [open, setOpen] = useState(false)
+
+  const segments = location.pathname.split('/').filter(Boolean)
+  const pcapIdFromPath = segments[0] === 'pcaps' ? segments[1] : undefined
+  const jobIdFromPath = segments[0] === 'jobs' ? segments[1] : undefined
+
+  const { data: job } = useQuery({
+    queryKey: ['job', jobIdFromPath],
+    queryFn: () => api.getJob(jobIdFromPath!),
+    enabled: !!jobIdFromPath
+  })
+
+  const { data: jobs } = useQuery({
+    queryKey: ['jobs', pcapIdFromPath],
+    queryFn: () => api.listJobs(String(pcapIdFromPath)),
+    enabled: !!pcapIdFromPath && !jobIdFromPath
+  })
+
+  const latestJobId = jobIdFromPath || (jobs && jobs.length > 0 ? String(jobs[0].id) : undefined)
+  const pcapId = pcapIdFromPath || (job?.pcap_id ? String(job.pcap_id) : undefined)
+  const viewerNavItems: NavItem[] = pcapId
+    ? [
+        { label: 'Overview', to: `/pcaps/${pcapId}`, icon: <LayoutDashboard size={16} /> },
+        { label: 'Packets', to: latestJobId ? `/jobs/${latestJobId}/packets` : '#', icon: <List size={16} />, disabled: !latestJobId },
+        { label: 'Triage', to: latestJobId ? `/jobs/${latestJobId}/triage` : '#', icon: <AlertTriangle size={16} />, disabled: !latestJobId }
+      ]
+    : []
 
   const logout = () => {
     auth.clearToken()
@@ -28,7 +54,7 @@ export function Shell({ children }: { children: ReactNode }) {
     <div className="min-h-screen bg-background text-foreground flex">
       <aside
         className={cn(
-          'hidden md:flex w-56 shrink-0 border-r border-border flex-col bg-card/70 backdrop-blur',
+          'hidden md:flex w-56 shrink-0 border-r border-border flex-col bg-card/70 backdrop-blur md:sticky md:top-0 md:h-screen md:overflow-hidden',
           open && 'block'
         )}
       >
@@ -40,7 +66,8 @@ export function Shell({ children }: { children: ReactNode }) {
             NetSage
           </Link>
         </div>
-        <nav className="flex-1 px-2 py-4 space-y-1">
+        <nav className="flex-1 px-2 py-4 space-y-1 overflow-hidden">
+          <div className="text-[11px] uppercase tracking-wide text-muted-foreground px-3 mb-2">Workspace</div>
           {navItems.map((item) => {
             const active = location.pathname.startsWith(item.to)
             return (
@@ -57,6 +84,29 @@ export function Shell({ children }: { children: ReactNode }) {
               </Link>
             )
           })}
+          {viewerNavItems.length ? (
+            <div className="pt-4">
+              <div className="text-[11px] uppercase tracking-wide text-muted-foreground px-3 mb-2">Viewer</div>
+              {viewerNavItems.map((item) => {
+                const active = location.pathname.startsWith(item.to)
+                return (
+                  <Link
+                    key={item.label}
+                    to={item.to}
+                    aria-disabled={item.disabled}
+                    className={cn(
+                      'flex items-center gap-2 px-3 py-2 text-sm rounded-md border',
+                      active ? 'border-primary text-primary bg-primary/10' : 'border-transparent hover:border-border',
+                      item.disabled && 'opacity-50 pointer-events-none'
+                    )}
+                  >
+                    {item.icon}
+                    {item.label}
+                  </Link>
+                )
+              })}
+            </div>
+          ) : null}
         </nav>
         <div className="p-3 border-t border-border">
           <Button variant="outline" className="w-full justify-center" onClick={logout}>

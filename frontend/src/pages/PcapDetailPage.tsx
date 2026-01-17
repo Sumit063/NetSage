@@ -1,12 +1,16 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { api } from '../lib/api'
-import { CartesianGrid, Cell, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { Page } from '../components/Page'
 import { Panel } from '../components/Panel'
 import { Button } from '../components/ui/button'
 import { Tabs } from '../components/ui/tabs'
-import { Skeleton } from '../components/ui/skeleton'
+import { ExpandableChartPanel } from '../components/charts/ExpandableChartPanel'
+import { OverviewTab } from '../components/overview/OverviewTab'
+import { useJobSummary } from '../hooks/useJobSummary'
+import { PacketFilters, buildPacketSearchParams } from '../utils/filters'
+import { chartAxisLabel, chartAxisTick, chartTooltip } from '../utils/chartTheme'
 
 function parseJsonField<T>(value: string | null): T {
   if (!value) return [] as T
@@ -21,13 +25,13 @@ export default function PcapDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
 
-  const { data: summary } = useQuery({ queryKey: ['summary', id], queryFn: () => api.getSummary(id!) })
   const { data: stats } = useQuery({ queryKey: ['stats', id], queryFn: () => api.getStats(id!) })
   const { data: flows } = useQuery({ queryKey: ['flows', id], queryFn: () => api.listFlows(id!) })
   const { data: issues } = useQuery({ queryKey: ['issues', id], queryFn: () => api.listIssues(id!) })
   const { data: jobs } = useQuery({ queryKey: ['jobs', id], queryFn: () => api.listJobs(id!), enabled: !!id })
+  const latestJob = jobs && jobs.length > 0 ? jobs[0] : null
+  const { data: jobSummary } = useJobSummary(latestJob?.id)
 
-  const topTalkers = parseJsonField<any[]>(stats?.top_talkers_json)
   const topFlows = parseJsonField<any[]>(stats?.top_flows_json)
   const hist = parseJsonField<any>(stats?.rtt_histogram_json)
 
@@ -36,7 +40,7 @@ export default function PcapDetailPage() {
         const day = new Date(issue.created_at).toISOString().slice(0, 10)
         acc[day] = (acc[day] || 0) + 1
         return acc
-      }, {})
+      }, {} as Record<string, number>)
     : {}
   const issuesChart = Object.entries(issuesOverTime)
     .map(([day, count]) => ({ day, count }))
@@ -46,42 +50,70 @@ export default function PcapDetailPage() {
     ? hist.buckets.map((bucket: number, index: number) => ({ bucket, count: hist.counts[index] || 0 }))
     : []
 
-  const axisTick = { fill: 'hsl(var(--muted-foreground))', fontSize: 12 }
-  const axisLabel = { fill: 'hsl(var(--muted-foreground))', fontSize: 11 }
-  const tooltipStyle = {
-    background: 'hsl(var(--card))',
-    border: '1px solid hsl(var(--border))',
-    color: 'hsl(var(--foreground))'
-  }
-  const tooltipLabelStyle = { color: 'hsl(var(--foreground))' }
-  const tooltipItemStyle = { color: 'hsl(var(--foreground))' }
-  const protocolPie = summary
+  const issueCounts = Array.isArray(issues)
+    ? issues.reduce(
+        (acc: { HIGH: number; MED: number; LOW: number }, issue: any) => {
+          if (!issue?.severity) return acc
+          if (issue.severity >= 4) acc.HIGH += 1
+          else if (issue.severity >= 2) acc.MED += 1
+          else acc.LOW += 1
+          return acc
+        },
+        { HIGH: 0, MED: 0, LOW: 0 }
+      )
+    : { HIGH: 0, MED: 0, LOW: 0 }
+  const issueTotal = issueCounts.HIGH + issueCounts.MED + issueCounts.LOW
+  const issueSeries = issueTotal
     ? [
-        { name: 'TCP', value: summary.tcp_flows || 0 },
-        { name: 'UDP', value: summary.udp_flows || 0 }
+        { name: 'HIGH', value: issueCounts.HIGH },
+        { name: 'MED', value: issueCounts.MED },
+        { name: 'LOW', value: issueCounts.LOW }
       ]
     : []
-  const issuePie = summary
-    ? [
-        { name: 'HIGH', value: summary.issues?.HIGH || 0 },
-        { name: 'MED', value: summary.issues?.MED || 0 },
-        { name: 'LOW', value: summary.issues?.LOW || 0 }
-      ]
-    : []
-  const latestJob = jobs && jobs.length > 0 ? jobs[0] : null
 
   const triageTabDisabled = !latestJob
 
-  const renderPieLabel = (props: { cx: number; cy: number; midAngle: number; outerRadius: number; name: string; value: number }) => {
-    const radius = props.outerRadius + 14
-    const x = props.cx + radius * Math.cos(-props.midAngle * (Math.PI / 180))
-    const y = props.cy + radius * Math.sin(-props.midAngle * (Math.PI / 180))
-    return (
-      <text x={x} y={y} fill="hsl(var(--foreground))" textAnchor={x > props.cx ? 'start' : 'end'} dominantBaseline="central" fontSize={12}>
-        {props.name} {props.value}
-      </text>
-    )
+  const handleApplyFilters = (filters: PacketFilters) => {
+    if (!latestJob) return
+    const params = buildPacketSearchParams(new URLSearchParams(), filters)
+    navigate(`/jobs/${latestJob.id}/packets?${params.toString()}`)
   }
+
+  const renderIssueSeverityChart = () => (
+    <ResponsiveContainer width="100%" height="100%">
+      <BarChart data={issueSeries} margin={{ top: 10, right: 10, left: 10, bottom: 10 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+        <XAxis dataKey="name" tick={chartAxisTick} />
+        <YAxis tick={chartAxisTick} />
+        <Tooltip {...chartTooltip} />
+        <Bar dataKey="value" fill="hsl(var(--chart-3))" barSize={18} radius={[6, 6, 0, 0]} />
+      </BarChart>
+    </ResponsiveContainer>
+  )
+
+  const renderRttChart = () => (
+    <ResponsiveContainer width="100%" height="100%">
+      <LineChart data={rttData} margin={{ top: 10, right: 10, left: 10, bottom: 10 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+        <XAxis dataKey="bucket" tick={chartAxisTick} label={{ value: 'RTT bucket (ms)', position: 'insideBottom', offset: -4, ...chartAxisLabel }} />
+        <YAxis tick={chartAxisTick} label={{ value: 'Count', angle: -90, position: 'insideLeft', ...chartAxisLabel }} />
+        <Tooltip {...chartTooltip} />
+        <Line type="monotone" dataKey="count" stroke="hsl(var(--chart-3))" strokeWidth={2} dot={false} />
+      </LineChart>
+    </ResponsiveContainer>
+  )
+
+  const renderIssuesChart = () => (
+    <ResponsiveContainer width="100%" height="100%">
+      <LineChart data={issuesChart} margin={{ top: 10, right: 10, left: 10, bottom: 10 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+        <XAxis dataKey="day" tick={chartAxisTick} label={{ value: 'Date', position: 'insideBottom', offset: -4, ...chartAxisLabel }} />
+        <YAxis allowDecimals={false} tick={chartAxisTick} label={{ value: 'Issues', angle: -90, position: 'insideLeft', ...chartAxisLabel }} />
+        <Tooltip {...chartTooltip} />
+        <Line type="monotone" dataKey="count" stroke="hsl(var(--chart-2))" strokeWidth={2} dot={false} />
+      </LineChart>
+    </ResponsiveContainer>
+  )
 
   return (
     <Page>
@@ -89,181 +121,47 @@ export default function PcapDetailPage() {
         <Tabs
           value="overview"
           onValueChange={(val) => {
+            if (val === 'packets' && latestJob) {
+              navigate(`/jobs/${latestJob.id}/packets`)
+            }
             if (val === 'triage' && latestJob) {
               navigate(`/jobs/${latestJob.id}/triage`)
             }
           }}
           tabs={[
             { value: 'overview', label: 'Overview' },
+            { value: 'packets', label: 'Packets', disabled: triageTabDisabled },
             { value: 'triage', label: 'Triage', disabled: triageTabDisabled }
           ]}
         />
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-          <Panel className="p-4">
-            <div className="text-xs uppercase text-muted-foreground">Streams</div>
-            <div className="text-2xl font-semibold">
-              {summary ? (summary.stream_count ?? summary.total_flows) : <Skeleton className="h-6 w-20" />}
-            </div>
-          </Panel>
-          <Panel className="p-4">
-            <div className="text-xs uppercase text-muted-foreground">TCP Streams</div>
-            <div className="text-2xl font-semibold">
-              {summary ? (summary.tcp_streams ?? summary.tcp_flows ?? 0) : <Skeleton className="h-6 w-20" />}
-            </div>
-          </Panel>
-          <Panel className="p-4">
-            <div className="text-xs uppercase text-muted-foreground">TCP / UDP</div>
-            <div className="text-2xl font-semibold">
-              {summary ? `${summary.tcp_flows || 0} / ${summary.udp_flows || 0}` : <Skeleton className="h-6 w-24" />}
-            </div>
-          </Panel>
-          <Panel className="p-4">
-            <div className="text-xs uppercase text-muted-foreground">Issues H/M/L</div>
-            <div className="text-2xl font-semibold">
-              {summary
-                ? `${summary?.issues?.HIGH || 0}/${summary?.issues?.MED || 0}/${summary?.issues?.LOW || 0}`
-                : <Skeleton className="h-6 w-24" />}
-            </div>
-          </Panel>
+        <OverviewTab summary={jobSummary} onApplyFilters={handleApplyFilters} />
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+          <ExpandableChartPanel
+            title="Issues by Severity"
+            heightClassName="h-64"
+            renderChart={renderIssueSeverityChart}
+            empty={!issueSeries.length}
+            emptyLabel="No issues yet."
+          />
+          <ExpandableChartPanel
+            title="Issues Over Time"
+            heightClassName="h-64"
+            renderChart={renderIssuesChart}
+            empty={!issuesChart.length}
+            emptyLabel="No issues yet."
+          />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-          <Panel className="p-4">
-            <div className="text-sm font-semibold mb-2">Protocol Split</div>
-            <div className="h-64 flex items-center">
-              {protocolPie.length ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Tooltip contentStyle={tooltipStyle} labelStyle={tooltipLabelStyle} itemStyle={tooltipItemStyle} />
-                    <Pie
-                      data={protocolPie}
-                      dataKey="value"
-                      nameKey="name"
-                      innerRadius={55}
-                      outerRadius={80}
-                      paddingAngle={2}
-                      labelLine={false}
-                      label={renderPieLabel}
-                    >
-                      {protocolPie.map((entry) => (
-                        <Cell
-                          key={entry.name}
-                          fill={entry.name === 'TCP' ? 'hsl(var(--chart-1))' : 'hsl(var(--chart-4))'}
-                        />
-                      ))}
-                    </Pie>
-                  </PieChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="text-xs text-muted-foreground">No data yet.</div>
-              )}
-            </div>
-            <div className="flex items-center gap-4 text-xs text-muted-foreground">
-              <span className="inline-flex items-center gap-1">
-                <span className="h-2 w-2 rounded-sm bg-[hsl(var(--chart-1))]" /> TCP
-              </span>
-              <span className="inline-flex items-center gap-1">
-                <span className="h-2 w-2 rounded-sm bg-[hsl(var(--chart-4))]" /> UDP
-              </span>
-            </div>
-          </Panel>
-          <Panel className="p-4">
-            <div className="text-sm font-semibold mb-2">Issues by Severity</div>
-            <div className="h-64 flex items-center">
-              {issuePie.length ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Tooltip contentStyle={tooltipStyle} labelStyle={tooltipLabelStyle} itemStyle={tooltipItemStyle} />
-                    <Pie
-                      data={issuePie}
-                      dataKey="value"
-                      nameKey="name"
-                      innerRadius={55}
-                      outerRadius={80}
-                      paddingAngle={2}
-                      labelLine={false}
-                      label={renderPieLabel}
-                    >
-                      {issuePie.map((entry) => (
-                        <Cell
-                          key={entry.name}
-                          fill={
-                            entry.name === 'HIGH'
-                              ? 'hsl(var(--chart-5))'
-                              : entry.name === 'MED'
-                              ? 'hsl(var(--chart-3))'
-                              : 'hsl(var(--chart-2))'
-                          }
-                        />
-                      ))}
-                    </Pie>
-                  </PieChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="text-xs text-muted-foreground">No issues yet.</div>
-              )}
-            </div>
-            <div className="flex items-center gap-4 text-xs text-muted-foreground">
-              <span className="inline-flex items-center gap-1">
-                <span className="h-2 w-2 rounded-sm bg-[hsl(var(--chart-5))]" /> HIGH
-              </span>
-              <span className="inline-flex items-center gap-1">
-                <span className="h-2 w-2 rounded-sm bg-[hsl(var(--chart-3))]" /> MED
-              </span>
-              <span className="inline-flex items-center gap-1">
-                <span className="h-2 w-2 rounded-sm bg-[hsl(var(--chart-2))]" /> LOW
-              </span>
-            </div>
-          </Panel>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-          <Panel className="p-4">
-            <div className="text-sm font-semibold mb-2">Top Talkers</div>
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={topTalkers} margin={{ top: 10, right: 10, left: 10, bottom: 10 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="key" tick={false} label={{ value: 'Talker', position: 'insideBottom', offset: -4, ...axisLabel }} />
-                  <YAxis tick={axisTick} label={{ value: 'Bytes', angle: -90, position: 'insideLeft', ...axisLabel }} />
-                  <Tooltip contentStyle={tooltipStyle} labelStyle={tooltipLabelStyle} itemStyle={tooltipItemStyle} />
-                  <Line type="monotone" dataKey="value" stroke="hsl(var(--chart-1))" strokeWidth={2} dot={false} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </Panel>
-          <Panel className="p-4">
-            <div className="text-sm font-semibold mb-2">RTT Distribution (ms)</div>
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={rttData} margin={{ top: 10, right: 10, left: 10, bottom: 10 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="bucket" tick={axisTick} label={{ value: 'RTT bucket (ms)', position: 'insideBottom', offset: -4, ...axisLabel }} />
-                  <YAxis tick={axisTick} label={{ value: 'Count', angle: -90, position: 'insideLeft', ...axisLabel }} />
-                  <Tooltip contentStyle={tooltipStyle} labelStyle={tooltipLabelStyle} itemStyle={tooltipItemStyle} />
-                  <Line type="monotone" dataKey="count" stroke="hsl(var(--chart-3))" strokeWidth={2} dot={false} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </Panel>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-          <Panel className="p-4">
-            <div className="text-sm font-semibold mb-2">Issues Over Time</div>
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={issuesChart} margin={{ top: 10, right: 10, left: 10, bottom: 10 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="day" tick={axisTick} label={{ value: 'Date', position: 'insideBottom', offset: -4, ...axisLabel }} />
-                  <YAxis allowDecimals={false} tick={axisTick} label={{ value: 'Issues', angle: -90, position: 'insideLeft', ...axisLabel }} />
-                  <Tooltip contentStyle={tooltipStyle} labelStyle={tooltipLabelStyle} itemStyle={tooltipItemStyle} />
-                  <Line type="monotone" dataKey="count" stroke="hsl(var(--chart-2))" strokeWidth={2} dot={false} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </Panel>
+          <ExpandableChartPanel
+            title="RTT Distribution (ms)"
+            heightClassName="h-64"
+            renderChart={renderRttChart}
+            empty={!rttData.length}
+            emptyLabel="No data yet."
+          />
           <Panel className="p-4">
             <div className="text-sm font-semibold mb-2">Top Flows</div>
             <div className="space-y-2 max-h-64 overflow-auto scroll-sharp">

@@ -8,6 +8,7 @@ import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
 import { AnimatedDialog } from '../components/AnimatedDialog'
 import { Skeleton } from '../components/ui/skeleton'
+import { DetailGrid, DetailList, DetailItem } from '../components/DetailFields'
 
 function formatTime(value?: string) {
   if (!value) return 'n/a'
@@ -55,6 +56,48 @@ export default function FlowDetailPage() {
     return 'LOW'
   }
 
+  const handshakeItems: DetailItem[] =
+    flow?.protocol === 'TCP'
+      ? [
+          { label: 'SYN', value: formatTime(flow?.syn_time) },
+          { label: 'SYN/ACK', value: formatTime(flow?.syn_ack_time) },
+          { label: 'ACK', value: formatTime(flow?.ack_time) },
+          {
+            label: 'Handshake RTT',
+            value: typeof flow?.handshake_rtt_ms_estimate === 'number' ? `${flow.handshake_rtt_ms_estimate.toFixed(1)} ms` : 'n/a'
+          },
+          { label: 'RSTs', value: flow?.rst_count ?? 0 }
+        ]
+      : [
+          { label: 'UDP', value: 'Connectionless (no handshake)' },
+          { label: 'First seen', value: formatTime(flow?.start_ts) },
+          { label: 'Last seen', value: formatTime(flow?.end_ts) }
+        ]
+
+  const tlsItems: DetailItem[] = [
+    { label: 'TLS Version', value: flow?.tls_version ?? 'n/a' },
+    { label: 'ClientHello', value: flow?.tls_client_hello ? 'yes' : 'no' },
+    { label: 'ServerHello', value: flow?.tls_server_hello ? 'yes' : 'no' },
+    { label: 'TLS Alert', value: flow?.tls_alert ? `yes${flow.tls_alert_code ? ` (${flow.tls_alert_code})` : ''}` : 'no' },
+    { label: 'SNI', value: flow?.tls_sni ?? 'n/a' },
+    { label: 'ALPN', value: flow?.alpn ?? 'n/a' },
+    { label: 'HTTP', value: flow?.http_method ? `${flow.http_method} ${flow.http_host || ''}`.trim() : 'n/a' }
+  ]
+
+  const metricsItems: DetailItem[] = [
+    { label: 'TCP Stream', value: typeof flow?.tcp_stream === 'number' ? flow.tcp_stream : 'n/a' },
+    { label: 'Bytes C→S', value: flow?.bytes_client_to_server ?? '—' },
+    { label: 'Bytes S→C', value: flow?.bytes_server_to_client ?? '—' },
+    { label: 'Throughput', value: typeof flow?.throughput_bps === 'number' ? `${Math.round(flow.throughput_bps)} B/s` : 'n/a' },
+    { label: 'MSS', value: mss ?? 'n/a' },
+    { label: 'Est. MTU (v4/v6)', value: mss ? `${mtuV4} / ${mtuV6}` : 'n/a' },
+    { label: 'TCP Retransmits', value: flow?.tcp_retransmissions ?? 0 },
+    { label: 'Out-of-Order', value: flow?.out_of_order ?? 0 },
+    { label: 'Dup ACKs', value: flow?.dup_acks ?? 0 },
+    { label: 'RSTs', value: flow?.rst_count ?? 0 },
+    { label: 'Fragments', value: flow?.fragment_count ?? 0 }
+  ]
+
   return (
     <Page>
       <div className="space-y-4">
@@ -98,70 +141,22 @@ export default function FlowDetailPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <Panel className="p-4">
             <div className="text-sm font-semibold">TCP/UDP Handshake</div>
-            {flow?.protocol === 'TCP' ? (
-              <div className="space-y-1 mt-2 text-sm">
-                <div>SYN: {formatTime(flow?.syn_time)}</div>
-                <div>SYN/ACK: {formatTime(flow?.syn_ack_time)}</div>
-                <div>ACK: {formatTime(flow?.ack_time)}</div>
-                <div>Handshake RTT: {typeof flow?.handshake_rtt_ms_estimate === 'number' ? `${flow.handshake_rtt_ms_estimate.toFixed(1)} ms` : 'n/a'}</div>
-                <div>RSTs: {flow?.rst_count ?? 0}</div>
-              </div>
-            ) : (
-              <div className="space-y-1 mt-2 text-sm text-muted-foreground">
-                <div>UDP is connectionless (no handshake).</div>
-                <div>First seen: {formatTime(flow?.start_ts)}</div>
-                <div>Last seen: {formatTime(flow?.end_ts)}</div>
-              </div>
-            )}
+            <div className="mt-2">
+              <DetailList items={handshakeItems} />
+            </div>
           </Panel>
           <Panel className="p-4">
             <div className="text-sm font-semibold">TLS Handshake</div>
-            <div className="grid grid-cols-2 gap-2 text-sm mt-2">
-              <div className="text-muted-foreground">TLS Version</div>
-              <div className="font-mono">{flow?.tls_version ?? 'n/a'}</div>
-              <div className="text-muted-foreground">ClientHello</div>
-              <div className="font-mono">{flow?.tls_client_hello ? 'yes' : 'no'}</div>
-              <div className="text-muted-foreground">ServerHello</div>
-              <div className="font-mono">{flow?.tls_server_hello ? 'yes' : 'no'}</div>
-              <div className="text-muted-foreground">TLS Alert</div>
-              <div className="font-mono">{flow?.tls_alert ? `yes${flow.tls_alert_code ? ` (${flow.tls_alert_code})` : ''}` : 'no'}</div>
-              <div className="text-muted-foreground">SNI</div>
-              <div className="font-mono">{flow?.tls_sni ?? 'n/a'}</div>
-              <div className="text-muted-foreground">ALPN</div>
-              <div className="font-mono">{flow?.alpn ?? 'n/a'}</div>
-              <div className="text-muted-foreground">HTTP</div>
-              <div className="font-mono">
-                {flow?.http_method ? `${flow.http_method} ${flow.http_host || ''}` : 'n/a'}
-              </div>
+            <div className="mt-2">
+              <DetailList items={tlsItems} />
             </div>
           </Panel>
         </div>
 
         <Panel className="p-4">
           <div className="text-sm font-semibold">Metrics, MSS/MTU, Flags</div>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm mt-2">
-            <div className="text-muted-foreground">TCP Stream</div>
-            <div className="font-mono">{typeof flow?.tcp_stream === 'number' ? flow.tcp_stream : 'n/a'}</div>
-            <div className="text-muted-foreground">Bytes C→S</div>
-            <div className="font-mono">{flow?.bytes_client_to_server ?? '—'}</div>
-            <div className="text-muted-foreground">Bytes S→C</div>
-            <div className="font-mono">{flow?.bytes_server_to_client ?? '—'}</div>
-            <div className="text-muted-foreground">Throughput</div>
-            <div className="font-mono">{typeof flow?.throughput_bps === 'number' ? `${Math.round(flow.throughput_bps)} B/s` : 'n/a'}</div>
-            <div className="text-muted-foreground">MSS</div>
-            <div className="font-mono">{mss ?? 'n/a'}</div>
-            <div className="text-muted-foreground">Est. MTU (v4/v6)</div>
-            <div className="font-mono">{mss ? `${mtuV4} / ${mtuV6}` : 'n/a'}</div>
-            <div className="text-muted-foreground">TCP Retransmits</div>
-            <div className="font-mono">{flow?.tcp_retransmissions ?? 0}</div>
-            <div className="text-muted-foreground">Out-of-Order</div>
-            <div className="font-mono">{flow?.out_of_order ?? 0}</div>
-            <div className="text-muted-foreground">Dup ACKs</div>
-            <div className="font-mono">{flow?.dup_acks ?? 0}</div>
-            <div className="text-muted-foreground">RSTs</div>
-            <div className="font-mono">{flow?.rst_count ?? 0}</div>
-            <div className="text-muted-foreground">Fragments</div>
-            <div className="font-mono">{flow?.fragment_count ?? 0}</div>
+          <div className="mt-2">
+            <DetailGrid items={metricsItems} />
           </div>
         </Panel>
 

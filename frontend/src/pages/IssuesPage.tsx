@@ -11,7 +11,7 @@ import { Button } from '../components/ui/button'
 import { Select } from '../components/ui/select'
 import { Badge } from '../components/ui/badge'
 import { Skeleton } from '../components/ui/skeleton'
-import { severityLabel, severityVariant } from '../components/IssueSeverity'
+import { severityLabel } from '../components/IssueSeverity'
 
 function renderExplanation(exp: any) {
   if (!exp) {
